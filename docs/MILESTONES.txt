@@ -57,7 +57,7 @@ M0  FOUNDATIONS
                 - adminchat.omranisystems.com shows the backoffice login behind the gate
                 - h_chat.apk v0.1 installs on your phone
                 - the TURN relay answers from outside on all ports
-    Status    : [~] built 2026-10-16, waiting for your test and approval
+    Status    : [x] approved and merged to main 2026-10-16 (APK 0.1.1)
 
 M1  ACCOUNTS
     Backend   : sign-up, approval status, password + email code, recovery passcode, forced reset,
@@ -70,7 +70,7 @@ M1  ACCOUNTS
     DONE WHEN : you approve a test user, they log in on the phone, the web session is kicked,
                 and you see both devices in the backoffice
     APK       : v0.2
-    Status    : [ ] not started
+    Status    : [~] designing screens
 
 M2  CONTACTS
     Backend   : personal ID + regenerate, one-time invite codes (24 h), friend requests with category check,
