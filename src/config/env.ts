@@ -34,7 +34,7 @@ const schema = z.object({
     .transform((s) => s.split(",").map((u) => u.trim()).filter(Boolean)),
 
   MEDIA_DIR: z.string().default("/var/lib/h-chat/media"),
-  MOBILE_BUILDS_DIR: z.string().default("/projects/mobile_builds"),
+  MOBILE_BUILDS_DIR: z.string().default("/projects/mobile_builds/h_chat"),
 });
 
 export type Config = z.infer<typeof schema>;
