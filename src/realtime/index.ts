@@ -5,6 +5,8 @@ import { bus } from "../lib/events.js";
 import { logger } from "../lib/logger.js";
 import { User } from "../models/user.js";
 import { authenticate, COOKIE } from "../modules/auth/sessions.js";
+import { relatedUserIds } from "../modules/contacts/service.js";
+import { presence } from "./presence.js";
 
 function cookieToken(header: string | undefined) {
   for (const part of (header ?? "").split(";")) {
@@ -35,11 +37,26 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
     }
   });
 
+  // Online / last seen: contacts reload their list when someone opens or closes the app.
+  const announcePresence = (userId: string) =>
+    void relatedUserIds(userId)
+      .then((ids) => bus.contactsChanged(ids))
+      .catch(() => {});
+
   io.on("connection", (socket) => {
-    void socket.join([`user:${socket.data.userId}`, `session:${socket.data.sessionId}`]);
+    const userId = socket.data.userId as string;
+    void socket.join([`user:${userId}`, `session:${socket.data.sessionId}`]);
+    if (presence.connect(userId)) announcePresence(userId);
     socket.on("disconnect", () => {
-      void User.updateOne({ _id: socket.data.userId }, { lastSeenAt: new Date() }).catch(() => {});
+      const wentOffline = presence.disconnect(userId);
+      void User.updateOne({ _id: userId }, { lastSeenAt: new Date() })
+        .then(() => wentOffline && announcePresence(userId))
+        .catch(() => {});
     });
+  });
+
+  bus.on("contacts:changed", (userIds: string[]) => {
+    io.to(userIds.map((id) => `user:${id}`)).emit("contacts:changed");
   });
 
   // A session ended elsewhere (new sign-in, suspension, admin): tell its sockets why, then drop them.

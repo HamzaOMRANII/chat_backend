@@ -10,10 +10,17 @@ import { hashSecret, numericCode, verifySecret } from "../../lib/secrets.js";
 import { codeSchema, objectIdSchema, parse, usernameSchema } from "../../lib/validate.js";
 import { auth, requireAdmin } from "../../middleware/auth.js";
 import { AdminLog } from "../../models/adminLog.js";
+import { Block } from "../../models/block.js";
 import { Category, CHAT_MODES } from "../../models/category.js";
+import { Friendship, otherUserId } from "../../models/friendship.js";
+import { Invite } from "../../models/invite.js";
+import { Lookup } from "../../models/lookup.js";
 import { DeviceEvent } from "../../models/deviceEvent.js";
 import { Session } from "../../models/session.js";
 import { User, USER_STATUSES, type UserDoc } from "../../models/user.js";
+import { bus } from "../../lib/events.js";
+import { presence } from "../../realtime/presence.js";
+import { effectiveCategoryId, ensurePersonalId, relatedUserIds, sharedCategoryIds } from "../contacts/service.js";
 import { checkCode, openChallenge, sendCodeChallenge } from "../auth/routes.js";
 import { clearFailures, clearToken, deliverToken, isLocked, recordEvent, registerFailure, revokeAllSessions, revokeSession, startSession } from "../auth/sessions.js";
 
@@ -171,6 +178,7 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     user.approvedBy = auth(req).user._id;
     user.rejectedAt = undefined;
     await user.save();
+    await ensurePersonalId(user);
     await log(req, "user.approved", user._id, { categoryIds });
     res.json({ ok: true });
   });
@@ -192,6 +200,7 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     user.suspendedAt = new Date();
     await user.save();
     await revokeAllSessions(user._id, "suspended");
+    bus.contactsChanged(await relatedUserIds(user._id));
     await log(req, "user.suspended", user._id);
     res.json({ ok: true });
   });
@@ -202,6 +211,7 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     user.status = "approved";
     user.suspendedAt = undefined;
     await user.save();
+    bus.contactsChanged(await relatedUserIds(user._id));
     await log(req, "user.reactivated", user._id);
     res.json({ ok: true });
   });
@@ -239,7 +249,8 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     const before = user.categoryIds.map(String);
     user.categoryIds = await validCategoryIds(categoryIds);
     await user.save();
-    // Friendships in removed categories end here once contacts exist (M2).
+    // Contacts who no longer share a category are paused (hidden from both), not deleted: see the Contacts tab.
+    bus.contactsChanged([user.id, ...(await relatedUserIds(user._id))]);
     await log(req, "user.categories_changed", user._id, { before, after: categoryIds });
     res.json({ ok: true });
   });
@@ -250,8 +261,71 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     const user = await findUser(req.params.id as string);
     if (confirm !== user.username) throw badRequest("Type the username exactly to confirm.", "confirm_mismatch");
     await revokeAllSessions(user._id, "deleted");
+    const related = await relatedUserIds(user._id);
+    await Promise.all([
+      Friendship.deleteMany({ $or: [{ userA: user._id }, { userB: user._id }] }),
+      Block.deleteMany({ $or: [{ blockerId: user._id }, { blockedId: user._id }] }),
+      Invite.deleteMany({ ownerId: user._id }),
+      Lookup.deleteMany({ userId: user._id }),
+    ]);
     await user.deleteOne();
+    bus.contactsChanged(related);
     await log(req, "user.deleted", user._id, { username: user.username, email: user.email });
+    res.json({ ok: true });
+  });
+
+  // ---------- Contacts of a user ----------
+  router.get("/users/:id/contacts", admin, async (req, res) => {
+    const user = await findUser(req.params.id as string);
+    const friendships = await Friendship.find({ $or: [{ userA: user._id }, { userB: user._id }] }).sort({ createdAt: -1 }).lean();
+    const others = await User.find({ _id: { $in: friendships.map((f) => otherUserId(f, user._id)) } })
+      .select("username status categoryIds lastSeenAt")
+      .lean();
+    const byId = new Map(others.map((u) => [String(u._id), u]));
+    const rows = await Promise.all(
+      friendships.map(async (f) => {
+        const other = byId.get(String(otherUserId(f, user._id)));
+        if (!other) return null;
+        const shared = sharedCategoryIds(user, other);
+        return {
+          id: String(f._id),
+          status: f.status,
+          direction: String(f.requestedBy) === user.id ? "sent" : "received",
+          via: f.via,
+          createdAt: f.createdAt,
+          acceptedAt: f.acceptedAt ?? null,
+          user: { id: String(other._id), username: other.username, status: other.status, online: presence.isOnline(other._id), lastSeenAt: other.lastSeenAt ?? null },
+          sharedCategoryIds: shared,
+          categoryId: await effectiveCategoryId(shared, f.categoryId),
+          categoryChosen: !!f.categoryId && shared.includes(String(f.categoryId)),
+          paused: !shared.length || other.status !== "approved" || user.status !== "approved",
+        };
+      }),
+    );
+    const list = rows.filter((r) => r !== null);
+    res.json({ personalId: user.personalId ?? null, contacts: list.filter((r) => r.status === "accepted"), requests: list.filter((r) => r.status === "pending") });
+  });
+
+  // Which shared category's rules apply to this pair.
+  router.put("/friendships/:id/category", admin, async (req, res) => {
+    const { categoryId } = parse(z.object({ categoryId: objectIdSchema }), req.body);
+    const f = await Friendship.findById(parse(objectIdSchema, req.params.id));
+    if (!f) throw notFound("Contact not found");
+    const [a, b] = await Promise.all([User.findById(f.userA).lean(), User.findById(f.userB).lean()]);
+    if (!a || !b || !sharedCategoryIds(a, b).includes(categoryId)) throw badRequest("Both people must be in this category.", "not_shared");
+    f.categoryId = new Types.ObjectId(categoryId);
+    await f.save();
+    await log(req, "friendship.category_changed", undefined, { pair: `${a.username} + ${b.username}`, categoryId });
+    res.json({ ok: true });
+  });
+
+  router.delete("/friendships/:id", admin, async (req, res) => {
+    const f = await Friendship.findById(parse(objectIdSchema, req.params.id));
+    if (!f) throw notFound("Contact not found");
+    const [a, b] = await Promise.all([User.findById(f.userA).select("username").lean(), User.findById(f.userB).select("username").lean()]);
+    await f.deleteOne();
+    bus.contactsChanged([f.userA, f.userB]);
+    await log(req, "friendship.ended", undefined, { pair: `${a?.username ?? "?"} + ${b?.username ?? "?"}` });
     res.json({ ok: true });
   });
 
