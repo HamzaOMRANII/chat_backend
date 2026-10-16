@@ -5,10 +5,15 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import { pinoHttp } from "pino-http";
 import type { Config } from "./config/env.js";
+import { HttpError } from "./lib/errors.js";
 import { logger } from "./lib/logger.js";
+import type { Mailer } from "./lib/mailer.js";
+import { createAdminRouter } from "./modules/admin/routes.js";
+import { createAuthRouter } from "./modules/auth/routes.js";
+import { createMeRouter } from "./modules/me/routes.js";
 import { healthRouter } from "./routes/health.js";
 
-export function createApp(config: Config) {
+export function createApp(config: Config, mailer: Mailer) {
   const app = express();
 
   app.disable("x-powered-by");
@@ -31,12 +36,27 @@ export function createApp(config: Config) {
   );
 
   app.use("/api/health", healthRouter);
+  app.use("/api/auth", createAuthRouter(config, mailer));
+  app.use("/api/me", createMeRouter(config, mailer));
+  app.use("/api/admin", createAdminRouter(config, mailer));
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Not found" });
   });
 
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message, code: err.code, ...(err.details && { details: err.details }) });
+      return;
+    }
+    if (err instanceof SyntaxError && "body" in err) {
+      res.status(400).json({ error: "Invalid JSON", code: "invalid_json" });
+      return;
+    }
+    if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ error: "This value is already used.", code: "taken" });
+      return;
+    }
     logger.error({ err }, "unhandled error");
     res.status(500).json({ error: "Something went wrong" });
   });

@@ -12,16 +12,21 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "create-admin": "node dist/scripts/create-admin.js"
   },
   "dependencies": {
+    "argon2": "^0.45.1",
+    "bowser": "^2.14.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^18.0.8",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.11.2",
+    "nodemailer": "^10.1.2",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "socket.io": "^4.8.4",
@@ -31,15 +36,19 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.5",
+    "@types/nodemailer": "^8.0.2",
     "@types/supertest": "^7.2.1",
     "pino-pretty": "^13.2.0",
+    "socket.io-client": "^4.8.4",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },
   "allowScripts": {
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "argon2@0.45.1": true
   }
 }
