@@ -6,7 +6,7 @@ import { clientDeviceSchema, deviceSnapshot, type DeviceSnapshot } from "../../l
 import { badRequest, conflict, forbidden, HttpError, locked, unauthorized } from "../../lib/errors.js";
 import type { Mailer } from "../../lib/mailer.js";
 import { hashSecret, maskEmail, numericCode, sameHash, sha256, verifySecret } from "../../lib/secrets.js";
-import { codeSchema, emailSchema, objectIdSchema, parse, passcodeSchema, passwordSchema, usernameSchema } from "../../lib/validate.js";
+import { codeSchema, emailSchema, loginFilter, loginIdSchema, objectIdSchema, parse, passcodeSchema, passwordSchema, usernameSchema } from "../../lib/validate.js";
 import { auth, requireUser } from "../../middleware/auth.js";
 import { Challenge } from "../../models/challenge.js";
 import { DeviceEvent } from "../../models/deviceEvent.js";
@@ -122,9 +122,9 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
 
   // Step 1: username + password. Account status is only revealed after a correct password.
   router.post("/login", authLimiter, async (req, res) => {
-    const body = parse(z.object({ username: usernameSchema, password: z.string().min(1).max(200), device: z.unknown() }), req.body);
+    const body = parse(z.object({ username: loginIdSchema, password: z.string().min(1).max(200), device: z.unknown() }), req.body);
     const d = device(req, body.device);
-    const user = await User.findOne({ username: body.username, role: "user" }).select("+passwordHash");
+    const user = await User.findOne({ ...loginFilter(body.username), role: "user" }).select("+passwordHash");
     if (user && isLocked(user)) throw locked("Too many wrong attempts. Try again in 30 minutes.");
     if (!user || !(await verifySecret(user.passwordHash, body.password))) {
       if (user) {
@@ -172,9 +172,9 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
 
   // Lost both email and passcode: one-time code the administrator gave out (backoffice "Reset access").
   router.post("/admin-reset", authLimiter, async (req, res) => {
-    const body = parse(z.object({ username: usernameSchema, code: z.string().regex(/^\d{10}$/), device: z.unknown() }), req.body);
+    const body = parse(z.object({ username: loginIdSchema, code: z.string().regex(/^\d{10}$/), device: z.unknown() }), req.body);
     const d = device(req, body.device);
-    const user = await User.findOne({ username: body.username, role: "user", status: "approved" }).select("+adminResetHash");
+    const user = await User.findOne({ ...loginFilter(body.username), role: "user", status: "approved" }).select("+adminResetHash");
     if (user && isLocked(user)) throw locked("Too many wrong attempts. Try again in 30 minutes.");
     const valid = user?.adminResetExpiresAt && user.adminResetExpiresAt > new Date() && (await verifySecret(user.adminResetHash, body.code));
     if (!user || !valid) {

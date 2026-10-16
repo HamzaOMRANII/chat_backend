@@ -66,6 +66,15 @@ describe("sign-in", () => {
     expect(me.body.user.username).toBe("hamza");
   });
 
+  it("accepts the account email instead of the username", async () => {
+    await approvedUser("hamza");
+    const res = await request(app).post("/api/auth/login").send({ username: " Hamza@Example.com ", password: PASSWORD, device: device() });
+    expect(res.status).toBe(200);
+    expect(mail.sent.at(-1)).toMatchObject({ to: "hamza@example.com", purpose: "login" });
+    const bad = await request(app).post("/api/auth/login").send({ username: "not valid!", password: PASSWORD, device: device() });
+    expect(bad.body.error).toMatch(/username or email/);
+  });
+
   it("gives the Android app a token in the body and accepts it as Bearer", async () => {
     await approvedUser("hamza");
     const step1 = await request(app).post("/api/auth/login").set("X-Client", "android").send({ username: "hamza", password: PASSWORD, device: device({ platform: "android", model: "SM-S911B", manufacturer: "samsung" }) });
