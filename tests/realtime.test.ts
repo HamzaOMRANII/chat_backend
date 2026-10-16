@@ -130,3 +130,18 @@ it("delivers new messages, typing and chat end live", async () => {
   leilaSocket.close();
   hamzaSocket.close();
 });
+
+it("accepts the web app's session cookie on the socket (the cookie covers /socket.io)", async () => {
+  await approvedUser("hamza");
+  const agent = request.agent(url);
+  const step1 = await agent.post("/api/auth/login").send({ username: "hamza", password: PASSWORD, device: device() });
+  const step2 = await agent.post("/api/auth/verify-code").send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
+  const cookie = (step2.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith("hc_session=") && !c.startsWith("hc_session=;"))!;
+  expect(cookie).toMatch(/Path=\/;/);
+  const socket = connect(url, { path: "/socket.io", transports: ["websocket"], extraHeaders: { cookie: cookie.split(";")[0]! } });
+  await new Promise<void>((resolve, reject) => {
+    socket.on("connect", () => resolve());
+    socket.on("connect_error", reject);
+  });
+  socket.close();
+});

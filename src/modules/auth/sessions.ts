@@ -17,7 +17,10 @@ const TTL_SECONDS: Record<SessionKind, number> = {
   admin: 2 * 60 * 60,
 };
 export const COOKIE = { user: "hc_session", admin: "hc_admin" } as const;
-const COOKIE_PATH = { user: "/api", admin: "/api/admin" } as const;
+// The user cookie must also reach /socket.io (live updates on the web), so it covers the whole site.
+const COOKIE_PATH = { user: "/", admin: "/api/admin" } as const;
+// Before 2026-10-16 the user cookie was scoped to /api, which kept it away from the socket
+const LEGACY_USER_COOKIE_PATH = "/api";
 
 const MAX_FAILURES = 5;
 const LOCK_MINUTES = 30;
@@ -154,13 +157,20 @@ function cookieOptions(config: Config, kind: SessionKind): CookieOptions {
 /** Web: httpOnly cookie. Android app: the token goes in the JSON body instead. */
 export function deliverToken(req: Request, res: Response, config: Config, kind: SessionKind, token: string) {
   if (isAppRequest(req) && kind !== "admin") return { token };
+  if (kind !== "admin") res.clearCookie(COOKIE.user, { ...withoutMaxAge(cookieOptions(config, kind)), path: LEGACY_USER_COOKIE_PATH });
   res.cookie(kind === "admin" ? COOKIE.admin : COOKIE.user, token, cookieOptions(config, kind));
   return {};
 }
 
+function withoutMaxAge(options: CookieOptions) {
+  const { maxAge: _maxAge, ...rest } = options;
+  return rest;
+}
+
 export function clearToken(res: Response, config: Config, kind: "user" | "admin") {
-  const { maxAge: _maxAge, ...options } = cookieOptions(config, kind);
+  const options = withoutMaxAge(cookieOptions(config, kind));
   res.clearCookie(kind === "admin" ? COOKIE.admin : COOKIE.user, options);
+  if (kind === "user") res.clearCookie(COOKIE.user, { ...options, path: LEGACY_USER_COOKIE_PATH });
 }
 
 export function tokenFromRequest(req: Request, kind: "user" | "admin") {
