@@ -12,6 +12,10 @@ class Bus extends EventEmitter {
   sessionRevoked(event: SessionRevoked) {
     this.emit("session:revoked", event);
   }
+  /** These users' contacts or requests changed: their apps reload the list. */
+  contactsChanged(userIds: (string | { toString(): string })[]) {
+    if (userIds.length) this.emit("contacts:changed", [...new Set(userIds.map(String))]);
+  }
 }
 
 export const bus = new Bus();

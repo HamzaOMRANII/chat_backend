@@ -79,7 +79,7 @@ M2  CONTACTS
     Backoffice: friendships per user, change a friendship's category
     DONE WHEN : two users in the same category connect; a different category gets "not found"
     APK       : v0.3
-    Status    : [~] design check on the canvas
+    Status    : [~] design approved; built 2026-10-16 (APK 0.3.0), waiting for your test and approval
 
 M3  STORED CHATS (Keep-alive / Automatic)
     Backend   : encryption keys, chats with automatic expiry, category rules enforced,

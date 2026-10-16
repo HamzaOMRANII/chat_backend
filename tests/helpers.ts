@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import request from "supertest";
+import { newPersonalId } from "../src/modules/contacts/service.js";
 import type { Express } from "express";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config/env.js";
@@ -61,7 +62,7 @@ export async function signUp(app: Express, username: string, extra: Record<strin
     .send({ username, email: `${username}@example.com`, password: PASSWORD, passcode: PASSCODE, privacyAccepted: true, device: device(), ...extra });
 }
 
-/** Creates an approved user straight in the database. */
+/** Creates an approved user straight in the database (with a personal ID). */
 export async function approvedUser(username: string, categoryNames = ["Friends"]) {
   const categories = await Category.find({ name: { $in: categoryNames } });
   return User.create({
@@ -72,6 +73,7 @@ export async function approvedUser(username: string, categoryNames = ["Friends"]
     status: "approved",
     categoryIds: categories.map((c) => c._id),
     privacyAcceptedAt: new Date(),
+    personalId: newPersonalId(),
   });
 }
 

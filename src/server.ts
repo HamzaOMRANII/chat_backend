@@ -7,11 +7,15 @@ import { startCleanupJob } from "./jobs/cleanup.js";
 import { logger } from "./lib/logger.js";
 import { createMailer } from "./lib/mailer.js";
 import { seedCategories } from "./models/category.js";
+import { User } from "./models/user.js";
+import { ensurePersonalId } from "./modules/contacts/service.js";
 
 const config = loadConfig();
 
 await mongoose.connect(config.MONGO_URI);
 await seedCategories();
+// Accounts approved before contacts existed get their personal ID
+for (const user of await User.find({ role: "user", status: "approved", personalId: null })) await ensurePersonalId(user);
 logger.info("connected to MongoDB");
 
 const httpServer = createServer(createApp(config, createMailer(config)));

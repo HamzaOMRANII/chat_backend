@@ -10,6 +10,7 @@ import { logger } from "./lib/logger.js";
 import type { Mailer } from "./lib/mailer.js";
 import { createAdminRouter } from "./modules/admin/routes.js";
 import { createAuthRouter } from "./modules/auth/routes.js";
+import { createContactsRouter } from "./modules/contacts/routes.js";
 import { createMeRouter } from "./modules/me/routes.js";
 import { healthRouter } from "./routes/health.js";
 
@@ -38,6 +39,7 @@ export function createApp(config: Config, mailer: Mailer) {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", createAuthRouter(config, mailer));
   app.use("/api/me", createMeRouter(config, mailer));
+  app.use("/api/contacts", createContactsRouter(config));
   app.use("/api/admin", createAdminRouter(config, mailer));
 
   app.use("/api", (_req, res) => {

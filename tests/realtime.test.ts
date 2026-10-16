@@ -25,8 +25,8 @@ afterAll(async () => {
 });
 beforeEach(resetTestDb);
 
-async function appSignIn(name: string) {
-  const step1 = await request(url).post("/api/auth/login").set("X-Client", "android").send({ username: "hamza", password: PASSWORD, device: device({ name, platform: "android" }) });
+async function appSignIn(name: string, username = "hamza") {
+  const step1 = await request(url).post("/api/auth/login").set("X-Client", "android").send({ username, password: PASSWORD, device: device({ name, platform: "android" }) });
   const step2 = await request(url).post("/api/auth/verify-code").set("X-Client", "android").send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
   return step2.body.token as string;
 }
@@ -54,4 +54,41 @@ it("refuses a socket without a valid session", async () => {
   const error = await new Promise<Error>((resolve) => socket.on("connect_error", resolve));
   expect(error.message).toBe("unauthorized");
   socket.close();
+});
+
+function openSocket(token: string) {
+  const socket = connect(url, { path: "/socket.io", auth: { token }, transports: ["websocket"] });
+  return new Promise<typeof socket>((resolve, reject) => {
+    socket.on("connect", () => resolve(socket));
+    socket.on("connect_error", reject);
+  });
+}
+
+it("tells the other side about a request, and shows contacts online while the app is open", async () => {
+  await approvedUser("hamza");
+  const leila = await approvedUser("leila.b");
+  const hamzaToken = await appSignIn("Phone", "hamza");
+  const leilaToken = await appSignIn("Laptop", "leila.b");
+  const leilaSocket = await openSocket(leilaToken);
+
+  const changed = new Promise<void>((resolve) => leilaSocket.once("contacts:changed", () => resolve()));
+  const api = (path: string) => request(url).post(path).set("Authorization", `Bearer ${hamzaToken}`);
+  await api("/api/contacts/add").send({ personalId: leila.personalId }).expect(200);
+  await changed;
+
+  const requestId = (await request(url).get("/api/contacts").set("Authorization", `Bearer ${leilaToken}`)).body.incoming[0].id;
+  await request(url).post(`/api/contacts/requests/${requestId}/accept`).set("Authorization", `Bearer ${leilaToken}`).expect(200);
+
+  const cameOnline = new Promise<void>((resolve) => leilaSocket.once("contacts:changed", () => resolve()));
+  const hamzaSocket = await openSocket(hamzaToken);
+  await cameOnline;
+  const list = await request(url).get("/api/contacts").set("Authorization", `Bearer ${leilaToken}`);
+  expect(list.body.contacts[0]).toMatchObject({ username: "hamza", online: true });
+
+  const wentOffline = new Promise<void>((resolve) => leilaSocket.once("contacts:changed", () => resolve()));
+  hamzaSocket.close();
+  await wentOffline;
+  const after = await request(url).get("/api/contacts").set("Authorization", `Bearer ${leilaToken}`);
+  expect(after.body.contacts[0]).toMatchObject({ online: false, lastSeenAt: expect.any(String) });
+  leilaSocket.close();
 });
