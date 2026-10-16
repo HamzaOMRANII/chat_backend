@@ -37,6 +37,8 @@ Addresses
   [x] Backoffice gate code chosen
   [x] SMTP: reuse the Pass Manager email account
   [x] Ports 80/443 limited to Cloudflare addresses only
+  [x] MongoDB authentication on, one user per app database (2026-10-16)
+  [x] Server credentials and gate codes stored in the Pass Manager vault (Gym gate code still missing)
 
 
 4. MILESTONES
