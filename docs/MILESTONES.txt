@@ -1,0 +1,143 @@
+H_CHAT - DEVELOPMENT PLAN AND MILESTONES
+========================================
+Last updated: 2026-10-16
+Full design: /projects/chat_backend/docs/DESIGN.md
+Design canvas (approved): https://claude.ai/artifact/WyZ4FueUJzjUYidyZJjxQC
+
+
+1. THE PROJECTS
+---------------
+/projects/chat_backend      API + real-time server (Node, Express, Socket.IO, MongoDB)  -> PM2 "h-chat", port 12000
+/projects/chat_app          User app: web app + Android APK (React, Vite, Capacitor)
+/projects/chat_backoffice   Admin web app (React, Vite)
+/projects/mobile_builds     Signed APKs: h_chat-<version>.apk, h_chat.apk (latest), latest.json
+
+Addresses
+  chat.omranisystems.com        user web app, API, APK download   (Cloudflare proxied, behind gate except /api /socket.io /download)
+  adminchat.omranisystems.com   backoffice                        (Cloudflare proxied, behind gate, code stored hashed)
+  turn.omranisystems.com        call relay (coturn)               (DNS only -> 37.60.240.195)
+
+
+2. HOW EVERY PHASE RUNS
+-----------------------
+  1. Design check  : the phase's remaining screens drawn on the canvas -> you say yes
+  2. Build         : backend + tests first, then chat_app, then chat_backoffice (branch phase-N in each repo)
+  3. Test          : automated tests + two simulated users (live typing, calls, device kick)
+  4. Handover      : preview to test + new h_chat.apk in mobile_builds + list of changes + checklist
+  5. You approve   : merge to main and deploy live
+  -> The next phase starts only after your approval.
+
+
+3. SETUP CHECKS (DONE BEFORE PHASE 0)
+-------------------------------------
+  [x] Design approved (style, burgundy logo colours, screens)
+  [x] DNS: adminchat.omranisystems.com (proxied)
+  [x] DNS: turn.omranisystems.com -> 37.60.240.195, DNS only
+  [x] Firewall: UDP 3478, TCP 3478, TCP 5349, UDP 49160-49200
+  [x] Backoffice gate code chosen
+  [x] SMTP: reuse the Pass Manager email account
+  [x] Ports 80/443 limited to Cloudflare addresses only
+
+
+4. MILESTONES
+-------------
+
+M0  FOUNDATIONS
+    Backend   : TypeScript project, Express 5, Socket.IO, MongoDB (own database + user), settings in .env,
+                security basics (helmet, CORS, rate limits), /api/health, test setup
+    Chat app  : React + Vite + Tailwind with the approved design (colours, fonts, logo, base components),
+                Capacitor Android project, "npm run build:apk"
+    Backoffice: same base and design, sidebar layout, tables
+    TURN      : coturn installed, temporary credentials, Let's Encrypt certificate, internal network blocked
+    Server    : PM2 "h-chat" (port 12000), nginx for chat. and adminchat., gate changes, Java 21 + Android SDK,
+                signing key created (backup handed to you), deploy.sh extended
+    DONE WHEN : - chat.omranisystems.com shows the styled H_CHAT login page + APK download
+                - adminchat.omranisystems.com shows the backoffice login behind the gate
+                - h_chat.apk v0.1 installs on your phone
+                - the TURN relay answers from outside on all ports
+    Status    : [~] built 2026-10-16, waiting for your test and approval
+
+M1  ACCOUNTS
+    Backend   : sign-up, approval status, password + email code, recovery passcode, forced reset,
+                one active device (old one kicked), device + login history (90 days), categories,
+                admin login with email code
+    Chat app  : sign up (privacy notice, passcode), waiting for approval, login, email code,
+                lost email -> passcode -> reset, "signed in elsewhere" screen, last-login notice, my security log
+    Backoffice: login, users list, user details (account, devices, logins),
+                approve / reject / suspend / delete / force logout, categories (create, rules, members)
+    DONE WHEN : you approve a test user, they log in on the phone, the web session is kicked,
+                and you see both devices in the backoffice
+    APK       : v0.2
+    Status    : [ ] not started
+
+M2  CONTACTS
+    Backend   : personal ID + regenerate, one-time invite codes (24 h), friend requests with category check,
+                same "not found" answer for every failure, 10 lookups/hour, online / last seen
+    Chat app  : contacts, My ID + QR, invite codes, add contact (type or scan), requests
+    Backoffice: friendships per user, change a friendship's category
+    DONE WHEN : two users in the same category connect; a different category gets "not found"
+    APK       : v0.3
+    Status    : [ ] not started
+
+M3  STORED CHATS (Keep-alive / Automatic)
+    Backend   : encryption keys, chats with automatic expiry, category rules enforced,
+                read receipts, typing indicator, End chat deletes everything
+    Chat app  : start-chat dialog (only allowed modes), chat screen, countdowns, receipts, End chat
+    Backoffice: dashboard, chats list, last messages (metadata only), delete chat history
+    DONE WHEN : messages are stored encrypted, disappear on time, backoffice sees metadata only
+    APK       : v0.4
+    Status    : [ ] not started
+
+M4  LIVE MODE
+    Backend   : live invitation, relay of live typing (never written to disk), end on leave / 30 s offline
+    Chat app  : live chat (text appears while typing, Enter commits, wiped on exit)
+    Backoffice: live sessions shown (start, end, duration)
+    DONE WHEN : two phones see each other type in real time; Secret contacts get Live only
+    APK       : v0.5
+    Status    : [ ] not started
+
+M5  FILES
+    Backend   : encrypted upload in pieces (100 MB/file, 2 GB/user), disk guard (80%), hourly cleanup,
+                direct transfer in Live mode
+    Chat app  : attach, progress, download, image preview, expiry shown
+    Backoffice: storage screen, "clean up now"
+    DONE WHEN : a 100 MB file goes through Cloudflare and is gone after it expires
+    APK       : v0.6
+    Status    : [ ] not started
+
+M6  EXPORT
+    Backend   : export request / approval, 24 h download window
+    Chat app  : export button, approval card, zip built on the device
+    DONE WHEN : the zip opens and holds only what was approved
+    APK       : v0.7
+    Status    : [ ] not started
+
+M7  VOICE AND VIDEO CALLS
+    Backend   : call setup between devices, TURN credentials, identity check against eavesdropping
+    Chat app  : call screen (mute, camera, switch camera, hang up), Android mic/camera permissions
+    DONE WHEN : calls work on Wi-Fi and on mobile data (through the relay)
+    APK       : v0.8
+    Status    : [ ] not started
+
+M8  GROUPS (admin only)
+    Backend   : groups created by admin, group keys replaced when a member leaves, category rules
+    Chat app  : group chats
+    Backoffice: groups screen
+    DONE WHEN : a removed member cannot read new messages
+    APK       : v0.9
+    Status    : [ ] not started
+
+M9  FINISH -> RELEASE 1.0
+    Backend   : security review, rate-limit tuning, settings backup, activity log
+    Chat app  : polish, "update available" prompt, minimum version
+    Backoffice: activity log
+    DONE WHEN : release v1.0.0 deployed, h_chat.apk 1.0.0 published
+    Status    : [ ] not started
+
+
+5. WHAT YOU NEED TO DO DURING THE PROJECT
+-----------------------------------------
+  - M0 : store the APK signing key backup in your password manager
+  - M0 : say yes/no to limiting ports 80/443 to Cloudflare
+  - Each phase : test on your Android phone + approve
+  - M2 onward : a second device or test account to chat and call with
