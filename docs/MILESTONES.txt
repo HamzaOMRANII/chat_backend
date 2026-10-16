@@ -70,7 +70,7 @@ M1  ACCOUNTS
     DONE WHEN : you approve a test user, they log in on the phone, the web session is kicked,
                 and you see both devices in the backoffice
     APK       : v0.2
-    Status    : [~] built 2026-10-16 (APK 0.2.0), waiting for your test and approval
+    Status    : [x] approved and merged to main 2026-10-16 (APK 0.2.1)
 
 M2  CONTACTS
     Backend   : personal ID + regenerate, one-time invite codes (24 h), friend requests with category check,
@@ -79,7 +79,7 @@ M2  CONTACTS
     Backoffice: friendships per user, change a friendship's category
     DONE WHEN : two users in the same category connect; a different category gets "not found"
     APK       : v0.3
-    Status    : [ ] not started
+    Status    : [~] design check on the canvas
 
 M3  STORED CHATS (Keep-alive / Automatic)
     Backend   : encryption keys, chats with automatic expiry, category rules enforced,
