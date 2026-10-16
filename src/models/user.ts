@@ -13,6 +13,12 @@ const userSchema = new Schema(
     categoryIds: { type: [Schema.Types.ObjectId], ref: "Category", default: [] },
     // What others type to send a contact request (HC-XXXX-XXXX); given at approval, can be changed
     personalId: { type: String, unique: true, sparse: true },
+    // The signed-in device's public identity key (Ed25519, base64). Changes when the account moves to a new device.
+    identity: {
+      deviceId: String,
+      signPub: String,
+      at: Date,
+    },
 
     privacyAcceptedAt: Date,
     approvedAt: Date,

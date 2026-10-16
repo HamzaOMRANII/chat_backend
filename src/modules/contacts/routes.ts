@@ -11,6 +11,7 @@ import { Friendship, pair } from "../../models/friendship.js";
 import { Invite } from "../../models/invite.js";
 import { Lookup } from "../../models/lookup.js";
 import { User } from "../../models/user.js";
+import { reconcileChats } from "../chats/service.js";
 import {
   canConnect,
   contactJson,
@@ -178,6 +179,7 @@ export function createContactsRouter(config: Config) {
   router.delete("/:userId", async (req, res) => {
     const { f } = await contact(req);
     await f.deleteOne();
+    await reconcileChats([f.userA, f.userB]);
     bus.contactsChanged([f.userA, f.userB]);
     res.json({ ok: true });
   });
@@ -188,6 +190,7 @@ export function createContactsRouter(config: Config) {
     if (String(otherId) === String(me(req)._id)) throw conflict("You can't block yourself.");
     await Block.updateOne({ blockerId: me(req)._id, blockedId: otherId }, { $setOnInsert: { blockerId: me(req)._id, blockedId: otherId } }, { upsert: true });
     await Friendship.deleteOne({ pairKey: pair(me(req)._id, otherId).pairKey });
+    await reconcileChats([me(req)._id, otherId]);
     bus.contactsChanged([me(req)._id, otherId]);
     res.json({ ok: true });
   });

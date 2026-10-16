@@ -92,3 +92,41 @@ it("tells the other side about a request, and shows contacts online while the ap
   expect(after.body.contacts[0]).toMatchObject({ online: false, lastSeenAt: expect.any(String) });
   leilaSocket.close();
 });
+
+it("delivers new messages, typing and chat end live", async () => {
+  await approvedUser("hamza");
+  const leila = await approvedUser("leila.b");
+  const hamzaToken = await appSignIn("Phone", "hamza");
+  const leilaToken = await appSignIn("Laptop", "leila.b");
+  const as = (token: string) => ({ Authorization: `Bearer ${token}`, "X-Client": "android" });
+  const b64 = (n: number) => Buffer.alloc(n, 7).toString("base64");
+  const key = () => ({ pub: b64(32), sig: b64(64) });
+  // identity keys (device ids come from appSignIn's device())
+  const me = async (token: string) => (await request(url).get("/api/me/security-log").set(as(token))).body.current.deviceId as string;
+  for (const token of [hamzaToken, leilaToken]) await request(url).put("/api/keys/identity").set(as(token)).send({ deviceId: await me(token), signPub: b64(32) }).expect(200);
+  const { code } = (await request(url).post("/api/contacts/invite").set(as(hamzaToken))).body;
+  await request(url).post("/api/contacts/add").set(as(leilaToken)).send({ inviteCode: code }).expect(200);
+  const chatId = (await request(url).post("/api/chats").set(as(hamzaToken)).send({ userId: leila.id, mode: "keep", retentionDays: 1, key: key() })).body.chat.id;
+  await request(url).post(`/api/chats/${chatId}/accept`).set(as(leilaToken)).send({ key: key() }).expect(200);
+
+  const leilaSocket = await openSocket(leilaToken);
+  const hamzaSocket = await openSocket(hamzaToken);
+
+  const arrived = new Promise<{ chatId: string; message: { ciphertext: string } }>((resolve) => leilaSocket.once("msg:new", resolve));
+  await request(url).post(`/api/chats/${chatId}/messages`).set(as(hamzaToken)).send({ ciphertext: b64(40), nonce: b64(24), senderKeyVersion: 1, recipientKeyVersion: 1 }).expect(201);
+  expect((await arrived).chatId).toBe(chatId);
+
+  const read = new Promise<{ read: string[] }>((resolve) => hamzaSocket.once("msg:status", resolve));
+  await request(url).post(`/api/chats/${chatId}/receipts`).set(as(leilaToken)).send({ read: true }).expect(200);
+  expect((await read).read).toHaveLength(1);
+
+  const typing = new Promise<{ chatId: string }>((resolve) => leilaSocket.once("typing", resolve));
+  hamzaSocket.emit("typing", { chatId });
+  expect((await typing).chatId).toBe(chatId);
+
+  const ended = new Promise<{ reason: string }>((resolve) => hamzaSocket.once("chat:ended", resolve));
+  await request(url).delete(`/api/chats/${chatId}`).set(as(leilaToken)).expect(200);
+  expect((await ended).reason).toBe("ended_by_user");
+  leilaSocket.close();
+  hamzaSocket.close();
+});

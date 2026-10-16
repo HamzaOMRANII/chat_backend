@@ -3,6 +3,7 @@ import { Server } from "socket.io";
 import type { Config } from "../config/env.js";
 import { bus } from "../lib/events.js";
 import { logger } from "../lib/logger.js";
+import { Chat } from "../models/chat.js";
 import { User } from "../models/user.js";
 import { authenticate, COOKIE } from "../modules/auth/sessions.js";
 import { relatedUserIds } from "../modules/contacts/service.js";
@@ -47,12 +48,29 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
     const userId = socket.data.userId as string;
     void socket.join([`user:${userId}`, `session:${socket.data.sessionId}`]);
     if (presence.connect(userId)) announcePresence(userId);
+    // "is typing…": relayed to the other participant of an active chat, never stored
+    socket.on("typing", (payload: unknown) => {
+      const chatId = (payload as { chatId?: unknown } | null)?.chatId;
+      if (typeof chatId !== "string" || !/^[a-f0-9]{24}$/.test(chatId)) return;
+      void Chat.findOne({ _id: chatId, participants: userId, status: "active" })
+        .select("participants")
+        .lean()
+        .then((chat) => {
+          const other = chat?.participants.find((p) => String(p) !== userId);
+          if (other) io.to(`user:${String(other)}`).emit("typing", { chatId });
+        })
+        .catch(() => {});
+    });
     socket.on("disconnect", () => {
       const wentOffline = presence.disconnect(userId);
       void User.updateOne({ _id: userId }, { lastSeenAt: new Date() })
         .then(() => wentOffline && announcePresence(userId))
         .catch(() => {});
     });
+  });
+
+  bus.on("to:users", ({ userIds, event, payload }: { userIds: string[]; event: string; payload?: unknown }) => {
+    io.to(userIds.map((id) => `user:${id}`)).emit(event, payload);
   });
 
   bus.on("contacts:changed", (userIds: string[]) => {

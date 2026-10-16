@@ -12,6 +12,10 @@ class Bus extends EventEmitter {
   sessionRevoked(event: SessionRevoked) {
     this.emit("session:revoked", event);
   }
+  /** Sends a socket event to these users' open apps (e.g. "msg:new", "chats:changed", "typing"). */
+  toUsers(userIds: (string | { toString(): string })[], event: string, payload?: unknown) {
+    if (userIds.length) this.emit("to:users", { userIds: [...new Set(userIds.map(String))], event, payload });
+  }
   /** These users' contacts or requests changed: their apps reload the list. */
   contactsChanged(userIds: (string | { toString(): string })[]) {
     if (userIds.length) this.emit("contacts:changed", [...new Set(userIds.map(String))]);
