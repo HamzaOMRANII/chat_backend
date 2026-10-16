@@ -88,7 +88,7 @@ M3  STORED CHATS (Keep-alive / Automatic)
     Backoffice: dashboard, chats list, last messages (metadata only), delete chat history
     DONE WHEN : messages are stored encrypted, disappear on time, backoffice sees metadata only
     APK       : v0.4
-    Status    : [~] design check on the canvas
+    Status    : [~] design approved; built 2026-10-16 (APK 0.4.0), waiting for your test and approval
 
 M4  LIVE MODE
     Backend   : live invitation, relay of live typing (never written to disk), end on leave / 30 s offline

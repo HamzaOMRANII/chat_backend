@@ -20,6 +20,14 @@ await seedCategories();
 
 const mail = fakeMailer();
 const outer = express();
+// Same Content-Security-Policy as nginx sends in production (socket on this origin instead of wss://chat…)
+outer.use((_req, res, next) => {
+  res.setHeader(
+    "Content-Security-Policy",
+    `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://127.0.0.1:${port}; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
+  );
+  next();
+});
 outer.get("/__codes", (_req, res) => res.json(mail.sent));
 // Exactly what the database holds for messages, to check that no plaintext reaches the server
 outer.get("/__messages", async (_req, res) => res.json(await mongoose.connection.db!.collection("messages").find().toArray()));
