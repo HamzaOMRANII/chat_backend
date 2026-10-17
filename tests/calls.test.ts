@@ -7,6 +7,7 @@ import { io as connect, type Socket } from "socket.io-client";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import { Call } from "../src/models/call.js";
+import { FcmToken } from "../src/models/fcmToken.js";
 import { createRealtime } from "../src/realtime/index.js";
 import { callTiming } from "../src/modules/calls/service.js";
 import { approvedUser, config, connectTestDb, device, fakeMailer, PASSWORD, resetTestDb } from "./helpers.js";
@@ -80,6 +81,13 @@ describe("calls", () => {
     const { a, b } = await contacts(["Friends"]);
     const sa = await socketOf(a.token);
     expect(await ask(sa, "call:start", { to: b.id, kind: "voice" })).toEqual({ error: "offline" });
+    // App closed but registered with Firebase: it rings through the notification
+    await b.api("post", "/api/notifications/fcm", { token: "t".repeat(160) }).expect(200);
+    const rung = await ask<{ callId?: string }>(sa, "call:start", { to: b.id, kind: "voice" });
+    expect(rung.callId).toBeTruthy();
+    sa.emit("call:leave", { callId: rung.callId });
+    await new Promise((r) => setTimeout(r, 200));
+    await FcmToken.deleteMany({});
     await b.api("put", "/api/me/calls", { receive: false }).expect(200);
     expect((await b.api("get", "/api/me/calls")).body).toEqual({ receive: false });
     const sb = await socketOf(b.token);

@@ -51,7 +51,8 @@ export async function notify(userId: Types.ObjectId | string, n: Omit<Notificati
   try {
     const user = await User.findById(userId).select("notify activeSessionId status").lean();
     if (!user || user.status !== "approved") return;
-    const system = user.notify?.[PREF[n.kind]] !== false;
+    // A ringing call always reaches the phone (the "Receive calls" setting is what turns calls off)
+    const system = n.kind === "call" && n.body.startsWith("Incoming") ? true : user.notify?.[PREF[n.kind]] !== false;
     bus.toUsers([userId], "notify", { ...n, system });
     if (!system || !user.activeSessionId || presence.onScreen(user.activeSessionId)) return;
     // Android app closed or in the background: Firebase (generic text only)

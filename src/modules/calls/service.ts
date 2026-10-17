@@ -7,6 +7,7 @@ import { User } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
 import { pairOptions } from "../chats/service.js";
 import { notify } from "../notify/service.js";
+import { FcmToken } from "../../models/fcmToken.js";
 
 /** A call rings this long, and a participant whose connection drops has this long to come back. */
 export const callTiming = { ringMs: 45_000, dropMs: 30_000 };
@@ -61,7 +62,8 @@ export async function startCall(fromId: string, toId: string, kind: "voice" | "v
   const [from, to] = await Promise.all([User.findById(fromId).select("username identity").lean(), User.findById(toId).select("username identity receiveCalls").lean()]);
   if (!from || !to) return { error: "not_contact" };
   if (to.receiveCalls === false) return { error: "not_taking_calls" };
-  if (!presence.isOnline(toId)) return { error: "offline" };
+  // App closed: a phone registered with Firebase is rung through it (tapping the notification opens the ringing call)
+  if (!presence.isOnline(toId) && !(await FcmToken.exists({ userId: toId }))) return { error: "offline" };
   if (inCall(toId) || inCall(fromId)) return { error: "busy" };
   const call = await Call.create({ participants: [fromId, toId], startedBy: fromId, kind, status: "ringing" });
   const id = call.id as string;
