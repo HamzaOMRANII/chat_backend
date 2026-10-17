@@ -100,7 +100,7 @@ M4  LIVE MODE  [x] APPROVED 2026-10-17 (APK 0.5.1)
     Backoffice: live sessions shown (start, end, duration)
     DONE WHEN : two phones see each other type in real time; Secret contacts get Live only
     APK       : v0.5
-    Status    : [ ] not started
+    Status    : [x] APPROVED 2026-10-17 (APK 0.5.1)
 
 M5  FILES
     Backend   : encrypted upload in pieces (100 MB/file, 2 GB/user), disk guard (80%), hourly cleanup,
@@ -109,7 +109,7 @@ M5  FILES
     Backoffice: storage screen, "clean up now"
     DONE WHEN : a 100 MB file goes through Cloudflare and is gone after it expires
     APK       : v0.6
-    Status    : [ ] not started
+    Status    : [x] APPROVED 2026-10-17 (APK 0.6.3) — plus view-only files, admin ask-to-download, media screens
 
 M6  EXPORT
     Backend   : export request / approval, 24 h download window
