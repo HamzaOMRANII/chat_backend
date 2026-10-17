@@ -43,8 +43,8 @@ async function contacts(categoriesA = ["Friends"], categoriesB = ["Friends"]) {
   return { a, b, agentA, agentB };
 }
 
-async function activeChat(agentA: Agent, agentB: Agent, bId: string, mode = "keep", retentionDays = 3) {
-  const invite = await agentA.post("/api/chats").send({ userId: bId, mode, retentionDays, key: key() });
+async function activeChat(agentA: Agent, agentB: Agent, bId: string, mode = "keep", retentionMinutes = 3 * 1440) {
+  const invite = await agentA.post("/api/chats").send({ userId: bId, mode, retentionMinutes, key: key() });
   expect(invite.status).toBe(201);
   const accepted = await agentB.post(`/api/chats/${invite.body.chat.id}/accept`).send({ key: key() });
   expect(accepted.status).toBe(200);
@@ -60,11 +60,21 @@ describe("chat options", () => {
   it("Externals: keep-alive up to 3 days only; Secret: no stored chat at all", async () => {
     const { b, agentA } = await contacts(["Externals"], ["Externals"]);
     expect((await agentA.get(`/api/chats/options/${b.id}`)).body.options).toEqual({ keepMaxDays: 3, auto: false, live: false });
-    expect((await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionDays: 4, key: key() })).body.code).toBe("mode_not_allowed");
-    expect((await agentA.post("/api/chats").send({ userId: b.id, mode: "auto", retentionDays: 7, key: key() })).body.code).toBe("mode_not_allowed");
+    expect((await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionMinutes: 5760, key: key() })).body.code).toBe("mode_not_allowed");
+    expect((await agentA.post("/api/chats").send({ userId: b.id, mode: "auto", retentionMinutes: 10080, key: key() })).body.code).toBe("mode_not_allowed");
 
     await Category.updateOne({ name: "Externals" }, { "rules.modes": ["live"], "rules.maxRetentionDays": 0 });
     expect((await agentA.get(`/api/chats/options/${b.id}`)).body.options).toEqual({ keepMaxDays: 0, auto: false, live: true });
+  });
+
+  it("Keep-alive durations: from 30 minutes, only the offered steps, up to the category's maximum", async () => {
+    const { b, agentA } = await contacts(["Confidential"], ["Confidential"]);
+    const start = (retentionMinutes: number) => agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionMinutes, key: key() });
+    expect((await start(45)).body.code).toBe("mode_not_allowed"); // not one of the steps
+    expect((await start(2880)).body.code).toBe("mode_not_allowed"); // Confidential allows 1 day at most
+    const ok = await start(30);
+    expect(ok.status).toBe(201);
+    expect(ok.body.chat.retentionMinutes).toBe(30);
   });
 
   it("needs a contact", async () => {
@@ -72,15 +82,15 @@ describe("chat options", () => {
     const stranger = await approvedUser("rami.t");
     const agent = await deviceUser(app, "hamza");
     expect((await agent.get(`/api/chats/options/${stranger.id}`)).status).toBe(404);
-    expect((await agent.post("/api/chats").send({ userId: stranger.id, mode: "keep", retentionDays: 1, key: key() })).status).toBe(404);
+    expect((await agent.post("/api/chats").send({ userId: stranger.id, mode: "keep", retentionMinutes: 1440, key: key() })).status).toBe(404);
   });
 });
 
 describe("invitation", () => {
   it("is seen by the other side, accepted, and becomes an active chat with both keys", async () => {
     const { a, b, agentA, agentB } = await contacts();
-    const invite = await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionDays: 3, key: key() });
-    expect(invite.body.chat).toMatchObject({ status: "invited", mode: "keep", retentionDays: 3, createdByMe: true, with: { username: "leila.b" } });
+    const invite = await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionMinutes: 4320, key: key() });
+    expect(invite.body.chat).toMatchObject({ status: "invited", mode: "keep", retentionMinutes: 4320, createdByMe: true, with: { username: "leila.b" } });
 
     const seen = (await agentB.get("/api/chats")).body.chats;
     expect(seen).toEqual([expect.objectContaining({ status: "invited", createdByMe: false, with: expect.objectContaining({ id: a.id }) })]);
@@ -97,7 +107,7 @@ describe("invitation", () => {
   it("allows one open chat per pair", async () => {
     const { b, agentA, agentB } = await contacts();
     await activeChat(agentA, agentB, b.id);
-    const again = await agentA.post("/api/chats").send({ userId: b.id, mode: "auto", retentionDays: 7, key: key() });
+    const again = await agentA.post("/api/chats").send({ userId: b.id, mode: "auto", retentionMinutes: 10080, key: key() });
     expect(again.body.code).toBe("chat_exists");
   });
 
@@ -108,18 +118,18 @@ describe("invitation", () => {
     const { agent: agentB } = await signIn(app, mail, "leila.b");
     const { code } = (await agent.post("/api/contacts/invite")).body;
     await agentB.post("/api/contacts/add").send({ inviteCode: code });
-    expect((await agent.post("/api/chats").send({ userId: b.id, mode: "keep", retentionDays: 1, key: key() })).body.code).toBe("no_identity");
+    expect((await agent.post("/api/chats").send({ userId: b.id, mode: "keep", retentionMinutes: 1440, key: key() })).body.code).toBe("no_identity");
     expect((await agent.put("/api/keys/identity").send({ deviceId: "someone-elses-device", signPub: b64(32) })).status).toBe(403);
   });
 
   it("declining deletes it; unanswered ones expire after 24 h", async () => {
     const { b, agentA, agentB } = await contacts();
-    const first = (await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionDays: 2, key: key() })).body.chat.id;
+    const first = (await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionMinutes: 2880, key: key() })).body.chat.id;
     await agentB.post(`/api/chats/${first}/decline`).expect(200);
     expect((await agentA.get("/api/chats")).body.chats).toHaveLength(0);
     expect((await Chat.findById(first))!.endReason).toBe("declined");
 
-    const second = (await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionDays: 2, key: key() })).body.chat.id;
+    const second = (await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionMinutes: 2880, key: key() })).body.chat.id;
     await Chat.updateOne({ _id: second }, { inviteExpiresAt: new Date(Date.now() - 1000) });
     await expireChats();
     expect((await Chat.findById(second))!.endReason).toBe("invite_expired");
@@ -129,12 +139,12 @@ describe("invitation", () => {
 describe("messages", () => {
   it("stores only ciphertext, expires with the chat's retention, and tracks delivered / read", async () => {
     const { a, b, agentA, agentB } = await contacts();
-    const chatId = await activeChat(agentA, agentB, b.id, "keep", 3);
+    const chatId = await activeChat(agentA, agentB, b.id, "keep", 30);
 
     const sent = await agentA.post(`/api/chats/${chatId}/messages`).send(encrypted());
     expect(sent.status).toBe(201);
     const stored = await Message.findById(sent.body.message.id);
-    expect(stored!.expiresAt.getTime() - stored!.sentAt.getTime()).toBe(3 * 24 * 3600_000);
+    expect(stored!.expiresAt.getTime() - stored!.sentAt.getTime()).toBe(30 * 60_000);
     expect(Object.keys(stored!.toObject())).not.toContain("text");
 
     expect((await agentB.get("/api/chats")).body.chats[0].unread).toBe(1);
@@ -190,7 +200,7 @@ describe("ending", () => {
 
   it("ends when tighter category rules no longer allow it", async () => {
     const { b, agentA, agentB } = await contacts();
-    const chatId = await activeChat(agentA, agentB, b.id, "keep", 5);
+    const chatId = await activeChat(agentA, agentB, b.id, "keep", 5 * 1440);
     const admin = await adminAgent(app, mail);
     const friends = await Category.findOne({ name: "Friends" });
     await admin.patch(`/api/admin/categories/${friends!.id}`).send({ rules: { ...friends!.toObject().rules, maxRetentionDays: 3 } }).expect(200);
@@ -201,7 +211,7 @@ describe("ending", () => {
 describe("backoffice", () => {
   it("shows metadata only and can delete a chat's history with a typed confirmation", async () => {
     const { b, agentA, agentB } = await contacts();
-    const chatId = await activeChat(agentA, agentB, b.id, "auto", 7);
+    const chatId = await activeChat(agentA, agentB, b.id, "auto", 10080);
     await agentA.post(`/api/chats/${chatId}/messages`).send(encrypted());
     const admin = await adminAgent(app, mail);
 

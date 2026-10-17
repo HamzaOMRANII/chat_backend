@@ -106,7 +106,7 @@ it("delivers new messages, typing and chat end live", async () => {
   for (const token of [hamzaToken, leilaToken]) await request(url).put("/api/keys/identity").set(as(token)).send({ deviceId: await me(token), signPub: b64(32) }).expect(200);
   const { code } = (await request(url).post("/api/contacts/invite").set(as(hamzaToken))).body;
   await request(url).post("/api/contacts/add").set(as(leilaToken)).send({ inviteCode: code }).expect(200);
-  const chatId = (await request(url).post("/api/chats").set(as(hamzaToken)).send({ userId: leila.id, mode: "keep", retentionDays: 1, key: key() })).body.chat.id;
+  const chatId = (await request(url).post("/api/chats").set(as(hamzaToken)).send({ userId: leila.id, mode: "keep", retentionMinutes: 1440, key: key() })).body.chat.id;
   await request(url).post(`/api/chats/${chatId}/accept`).set(as(leilaToken)).send({ key: key() }).expect(200);
 
   const leilaSocket = await openSocket(leilaToken);

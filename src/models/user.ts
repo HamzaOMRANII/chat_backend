@@ -20,6 +20,13 @@ const userSchema = new Schema(
       at: Date,
     },
 
+    // Which events show a system notification (in-app banners always show)
+    notify: {
+      messages: { type: Boolean, default: true },
+      chats: { type: Boolean, default: true },
+      contacts: { type: Boolean, default: true },
+    },
+
     privacyAcceptedAt: Date,
     approvedAt: Date,
     approvedBy: { type: Schema.Types.ObjectId, ref: "User" },

@@ -6,11 +6,12 @@ import { badRequest, conflict, forbidden, notFound } from "../../lib/errors.js";
 import { bus } from "../../lib/events.js";
 import { objectIdSchema, parse } from "../../lib/validate.js";
 import { auth, requireUser } from "../../middleware/auth.js";
-import { Chat, STORED_MODES, type ChatDoc } from "../../models/chat.js";
+import { AUTO_MINUTES, Chat, STORED_MODES, type ChatDoc } from "../../models/chat.js";
 import { pair } from "../../models/friendship.js";
 import { Message } from "../../models/message.js";
 import { User, type UserDoc } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
+import { notify, retentionText } from "../notify/service.js";
 import { allows, endChat, INVITE_HOURS, pairOptions } from "./service.js";
 
 // libsodium base64 (original variant): 32-byte keys, 64-byte signatures, 24-byte nonces
@@ -53,7 +54,7 @@ export function createChatsRouter(config: Config) {
           ? { id: String(other._id), username: other.username, online: presence.isOnline(other._id), lastSeenAt: other.lastSeenAt ?? null, identityPub: other.identity?.signPub ?? null }
           : null,
         mode: chat.mode,
-        retentionDays: chat.retentionDays,
+        retentionMinutes: chat.retentionMinutes,
         status: chat.status,
         createdByMe: String(chat.createdBy) === user.id,
         invitedAt: chat.invitedAt,
@@ -109,13 +110,13 @@ export function createChatsRouter(config: Config) {
 
   router.post("/chats", async (req, res) => {
     const body = parse(
-      z.object({ userId: objectIdSchema, mode: z.enum(STORED_MODES), retentionDays: z.number().int().min(1).max(7), key: chatKey }),
+      z.object({ userId: objectIdSchema, mode: z.enum(STORED_MODES), retentionMinutes: z.number().int().min(1).max(AUTO_MINUTES), key: chatKey }),
       req.body,
     );
     const user = me(req);
     const options = await pairOptions(user._id, body.userId);
     if (!options) throw notFound("Contact not found");
-    if (!allows(options, body.mode, body.retentionDays)) throw badRequest("This chat mode isn't available with this contact.", "mode_not_allowed");
+    if (!allows(options, body.mode, body.retentionMinutes)) throw badRequest("This chat mode isn't available with this contact.", "mode_not_allowed");
     if (await Chat.exists({ pairKey: pair(user._id, body.userId).pairKey, status: { $in: ["invited", "active"] } })) {
       throw conflict("You already have a chat with this contact.", "chat_exists");
     }
@@ -123,7 +124,7 @@ export function createChatsRouter(config: Config) {
       participants: [user._id, new Types.ObjectId(body.userId)],
       pairKey: pair(user._id, body.userId).pairKey,
       mode: body.mode,
-      retentionDays: body.retentionDays,
+      retentionMinutes: body.retentionMinutes,
       status: "invited",
       createdBy: user._id,
       categoryId: options.categoryId,
@@ -131,6 +132,13 @@ export function createChatsRouter(config: Config) {
       inviteExpiresAt: new Date(Date.now() + INVITE_HOURS * 3600_000),
     });
     bus.toUsers([body.userId], "chats:changed");
+    void notify(body.userId, {
+      kind: "chat_invite",
+      title: user.username,
+      body: `invites you to ${body.mode === "auto" ? "an Automatic" : "a Keep-alive"} chat · messages stay ${retentionText(body.retentionMinutes)}`,
+      tag: `chat:${chat.id}`,
+      open: { chatId: chat.id },
+    });
     const [json] = await chatsJson(user, [chat]);
     res.status(201).json({ chat: json });
   });
@@ -141,7 +149,7 @@ export function createChatsRouter(config: Config) {
     const chat = await openChat(req, ["invited"]);
     if (String(chat.createdBy) === user.id) throw conflict("Wait for the other person to accept.");
     const options = await pairOptions(chat.participants[0]!, chat.participants[1]!);
-    if (!allows(options, chat.mode as "keep" | "auto", chat.retentionDays)) {
+    if (!allows(options, chat.mode as "keep" | "auto", chat.retentionMinutes)) {
       await endChat(chat, "rules_changed");
       throw notFound("This chat has ended.");
     }
@@ -151,6 +159,9 @@ export function createChatsRouter(config: Config) {
     chat.inviteExpiresAt = undefined;
     await chat.save();
     bus.toUsers(chat.participants, "chats:changed");
+    // The one who invited: their app opens the chat
+    bus.toUsers([chat.createdBy], "chat:accepted", { chatId: chat.id, by: user.id });
+    void notify(chat.createdBy, { kind: "chat_accepted", title: user.username, body: "accepted your chat. You can write now.", tag: `chat:${chat.id}`, open: { chatId: chat.id } });
     const [json] = await chatsJson(user, [chat]);
     res.json({ chat: json });
   });
@@ -227,7 +238,7 @@ export function createChatsRouter(config: Config) {
       ...body,
       size,
       sentAt,
-      expiresAt: new Date(sentAt.getTime() + chat.retentionDays * 24 * 3600_000),
+      expiresAt: new Date(sentAt.getTime() + chat.retentionMinutes * 60_000),
     });
     await Chat.updateOne({ _id: chat._id }, { $set: { lastMessageAt: sentAt }, $inc: { messageCount: 1, storedBytes: size } });
     const json = {
@@ -243,6 +254,8 @@ export function createChatsRouter(config: Config) {
       expiresAt: message.expiresAt,
     };
     bus.toUsers([recipientId], "msg:new", { chatId: chat.id, message: json });
+    // Content is encrypted: the notification only says who wrote
+    void notify(recipientId, { kind: "message", title: user.username, body: "New message", tag: `chat:${chat.id}`, open: { chatId: chat.id } });
     res.status(201).json({ message: json });
   });
 

@@ -6,6 +6,7 @@ import type { DeviceSnapshot } from "../../lib/device.js";
 import { bus } from "../../lib/events.js";
 import { unauthorized } from "../../lib/errors.js";
 import { DeviceEvent, type DeviceEventFields } from "../../models/deviceEvent.js";
+import { PushSubscription } from "../../models/pushSubscription.js";
 import { Session, type SessionDoc } from "../../models/session.js";
 import { User, type UserDoc } from "../../models/user.js";
 
@@ -99,6 +100,8 @@ export async function revokeSession(session: SessionDoc, reason: NonNullable<Ses
   session.revokeReason = reason;
   if (by) session.revokedBy = sessionDevice(by);
   await session.save();
+  // Its browser notifications stop with it
+  await PushSubscription.deleteMany({ sessionId: session._id });
   bus.sessionRevoked({
     sessionId: session.id,
     userId: String(session.userId),

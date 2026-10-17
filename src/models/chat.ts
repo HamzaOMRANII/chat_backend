@@ -2,6 +2,9 @@ import { Schema, model, type InferSchemaType, type HydratedDocument, type Types 
 
 export const STORED_MODES = ["keep", "auto"] as const;
 export type StoredMode = (typeof STORED_MODES)[number];
+/** How long each message stays, in minutes: the choices offered for Keep-alive (Automatic is always 7 days). */
+export const RETENTION_MINUTES = [30, 60, 180, 360, 720, 1440, 2880, 4320, 5760, 7200, 8640, 10080] as const;
+export const AUTO_MINUTES = 10080;
 
 /**
  * One participant's public chat key (X25519), signed by their device identity key.
@@ -30,7 +33,7 @@ const chatSchema = new Schema(
     participants: { type: [Schema.Types.ObjectId], ref: "User", required: true },
     pairKey: { type: String, required: true, index: true },
     mode: { type: String, enum: STORED_MODES, required: true },
-    retentionDays: { type: Number, min: 1, max: 7, required: true },
+    retentionMinutes: { type: Number, enum: [...RETENTION_MINUTES] as number[], required: true },
     status: { type: String, enum: ["invited", "active", "ended"], required: true, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     // Category whose rules applied when the chat started (admin metadata, never shown to users)

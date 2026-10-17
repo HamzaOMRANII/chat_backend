@@ -2,15 +2,16 @@ import { Types } from "mongoose";
 import { bus } from "../../lib/events.js";
 import { logger } from "../../lib/logger.js";
 import { Category } from "../../models/category.js";
-import { Chat, type ChatDoc, type StoredMode } from "../../models/chat.js";
+import { AUTO_MINUTES, Chat, RETENTION_MINUTES, type ChatDoc, type StoredMode } from "../../models/chat.js";
 import { Friendship, pair } from "../../models/friendship.js";
 import { Message } from "../../models/message.js";
 import { User } from "../../models/user.js";
 import { blockedEitherWay, effectiveCategoryId, sharedCategoryIds } from "../contacts/service.js";
+import { notify } from "../notify/service.js";
 
 export const INVITE_HOURS = 24;
 export const ENDED_KEEP_DAYS = 30;
-const AUTO_DAYS = 7;
+const AUTO_DAYS = AUTO_MINUTES / 1440;
 
 export type ChatOptions = { keepMaxDays: number; auto: boolean; live: boolean };
 
@@ -40,10 +41,21 @@ export async function pairOptions(aId: Types.ObjectId | string, bId: Types.Objec
   };
 }
 
-export function allows(options: ChatOptions | null, mode: StoredMode, days: number) {
+/** Keep-alive: any offered duration up to the category's maximum days. Automatic: always 7 days. */
+export function allows(options: ChatOptions | null, mode: StoredMode, minutes: number) {
   if (!options) return false;
-  return mode === "auto" ? options.auto && days === AUTO_DAYS : options.keepMaxDays >= days && days >= 1;
+  if (mode === "auto") return options.auto && minutes === AUTO_MINUTES;
+  return (RETENTION_MINUTES as readonly number[]).includes(minutes) && minutes <= options.keepMaxDays * 1440;
 }
+
+/** What the other person is told when a chat ends ("who" = the one who did it, or the other participant). */
+const ENDED_TEXT: Record<string, (who: string) => { title: string; body: string }> = {
+  declined: (who) => ({ title: who, body: "declined your chat invitation" }),
+  cancelled: (who) => ({ title: who, body: "cancelled the chat invitation" }),
+  ended_by_user: (who) => ({ title: who, body: "ended the chat. All messages were deleted." }),
+  invite_expired: (who) => ({ title: who, body: "The chat invitation expired without an answer." }),
+  expired: (who) => ({ title: who, body: "The chat ended: all its messages had expired." }),
+};
 
 /** Ends a chat: every message and both public chat keys are deleted at once; metadata stays 30 days. */
 export async function endChat(chat: ChatDoc, reason: string, by?: Types.ObjectId | null) {
@@ -57,6 +69,15 @@ export async function endChat(chat: ChatDoc, reason: string, by?: Types.ObjectId
   await chat.save();
   await Message.deleteMany({ chatId: chat._id });
   bus.toUsers(chat.participants, "chat:ended", { chatId: chat.id, reason, by: by ? String(by) : null });
+
+  const people = await User.find({ _id: { $in: chat.participants } }).select("username").lean();
+  const name = (id: Types.ObjectId) => people.find((p) => String(p._id) === String(id))?.username ?? "Your contact";
+  for (const userId of chat.participants) {
+    if (by && String(userId) === String(by)) continue;
+    const other = chat.participants.find((p) => String(p) !== String(userId))!;
+    const text = (ENDED_TEXT[reason] ?? ((who: string) => ({ title: who, body: "Your chat was closed. All messages were deleted." })))(name(other));
+    void notify(userId, { kind: reason === "declined" ? "chat_declined" : "chat_ended", ...text, tag: `chat:${chat.id}`, open: {} });
+  }
 }
 
 /**
@@ -71,7 +92,7 @@ export async function reconcileChats(userIds: (Types.ObjectId | string)[]) {
   for (const chat of open) {
     const [a, b] = chat.participants;
     const options = await pairOptions(a!, b!);
-    if (!allows(options, chat.mode as StoredMode, chat.retentionDays)) {
+    if (!allows(options, chat.mode as StoredMode, chat.retentionMinutes)) {
       await endChat(chat, options ? "rules_changed" : "contact_unavailable");
       ended++;
     }
@@ -86,13 +107,13 @@ export async function reconcileAllChats() {
   return reconcileChats(open.flatMap((c) => c.participants));
 }
 
-/** Hourly: unanswered invitations expire; chats whose last message is gone (no activity for the retention) end. */
+/** Every minute: unanswered invitations expire; chats whose last message is gone (no activity for the retention) end. */
 export async function expireChats() {
   const now = Date.now();
   for (const chat of await Chat.find({ status: "invited", inviteExpiresAt: { $lt: new Date(now) } })) await endChat(chat, "invite_expired");
   const active = await Chat.find({ status: "active" });
   for (const chat of active) {
     const last = (chat.lastMessageAt ?? chat.acceptedAt ?? chat.invitedAt)!.getTime();
-    if (last + chat.retentionDays * 24 * 3600_000 < now && !(await Message.exists({ chatId: chat._id }))) await endChat(chat, "expired");
+    if (last + chat.retentionMinutes * 60_000 < now && !(await Message.exists({ chatId: chat._id }))) await endChat(chat, "expired");
   }
 }

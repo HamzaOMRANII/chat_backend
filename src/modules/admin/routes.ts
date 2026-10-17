@@ -398,7 +398,7 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
         people,
         label: people.map((p) => p.username).join(" + "),
         mode: c.mode,
-        retentionDays: c.retentionDays,
+        retentionMinutes: c.retentionMinutes,
         status: c.status,
         category: c.categoryId ? catNames.get(String(c.categoryId)) ?? null : null,
         startedBy: names.get(String(c.createdBy)) ?? null,

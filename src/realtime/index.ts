@@ -48,6 +48,10 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
     const userId = socket.data.userId as string;
     void socket.join([`user:${userId}`, `session:${socket.data.sessionId}`]);
     if (presence.connect(userId)) announcePresence(userId);
+    // On screen or in the background: decides whether a notification also goes out as a Web Push
+    const sessionId = socket.data.sessionId as string;
+    presence.visibility(sessionId, socket.id, (socket.handshake.auth as { visible?: unknown }).visible !== false);
+    socket.on("visibility", (payload: unknown) => presence.visibility(sessionId, socket.id, (payload as { visible?: unknown } | null)?.visible !== false));
     // "is typing…": relayed to the other participant of an active chat, never stored
     socket.on("typing", (payload: unknown) => {
       const chatId = (payload as { chatId?: unknown } | null)?.chatId;
@@ -62,6 +66,7 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
         .catch(() => {});
     });
     socket.on("disconnect", () => {
+      presence.leave(sessionId, socket.id);
       const wentOffline = presence.disconnect(userId);
       void User.updateOne({ _id: userId }, { lastSeenAt: new Date() })
         .then(() => wentOffline && announcePresence(userId))
