@@ -74,8 +74,8 @@ describe("exports", () => {
     expect((await agentA.post(`/api/exports/${two}/approve`)).body.code).toBe("not_pending");
   });
 
-  it("aren't allowed where the category forbids export", async () => {
+  it("are possible in every category, Confidential and Externals too (with approval)", async () => {
     const { agentA, chatId } = await chatBetween(["Confidential"]);
-    expect((await agentA.post(`/api/chats/${chatId}/exports`).send({ messages: true, media: true, period: "all" })).body.code).toBe("export_not_allowed");
+    expect((await agentA.post(`/api/chats/${chatId}/exports`).send({ messages: true, media: true, period: "all" })).status).toBe(201);
   });
 });

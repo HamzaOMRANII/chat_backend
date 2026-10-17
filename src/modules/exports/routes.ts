@@ -80,7 +80,8 @@ export function createExportsRouter(config: Config) {
     const user = me(req);
     const chat = await activeChat(req);
     const approverId = chat.participants.find((p) => String(p) !== user.id)!;
-    if (!(await pairOptions(user._id, approverId))?.export) throw forbidden("Exporting isn't allowed with this contact.", "export_not_allowed");
+    // Every category can export: the other side's approval is what protects the chat
+    if (!(await pairOptions(user._id, approverId))) throw notFound("Contact not found");
     if (await ExportRequest.exists({ chatId: chat._id, requestedBy: user._id, status: "pending", until: { $gt: new Date() } })) {
       throw conflict("You already asked. Wait for the answer.", "export_pending");
     }
