@@ -21,6 +21,7 @@ import {
   revokeAllSessions,
   revokeSession,
   startSession,
+  socketTicket,
 } from "./sessions.js";
 
 export const CODE_MINUTES = 5;
@@ -217,6 +218,11 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
     await recordEvent(user._id, "logout", session.device ? ({ ...session.device, name: session.device.name ?? "" } as DeviceSnapshot) : undefined);
     clearToken(res, config, "user");
     res.json({ ok: true });
+  });
+
+  // The web app's ticket for the live connection
+  router.get("/socket-ticket", requireUser(config), (req, res) => {
+    res.json({ ticket: socketTicket(config, auth(req).session) });
   });
 
   router.get("/me", requireUser(config, { allowReset: true }), async (req, res) => {

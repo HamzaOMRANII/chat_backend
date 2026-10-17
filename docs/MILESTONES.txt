@@ -88,7 +88,11 @@ M3  STORED CHATS (Keep-alive / Automatic)
     Backoffice: dashboard, chats list, last messages (metadata only), delete chat history
     DONE WHEN : messages are stored encrypted, disappear on time, backoffice sees metadata only
     APK       : v0.4
-    Status    : [~] design check on the canvas
+    Status    : [x] APPROVED 2026-10-17 (APK 0.4.4). Added after testing: Keep-alive from 30 min
+                (30m, 1h, 3h, 6h, 12h, 1-7 days), notifications for every event (banners, browser Web Push,
+                Android while the app runs), accepted chat opens by itself, ended chats leave the list,
+                faster refresh after sleep, live read receipts, web live connection by ticket.
+                Not done (your choice): Android notifications when the app is fully closed (Firebase).
 
 M4  LIVE MODE
     Backend   : live invitation, relay of live typing (never written to disk), end on leave / 30 s offline

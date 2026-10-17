@@ -11,6 +11,8 @@ import { Friendship, pair } from "../../models/friendship.js";
 import { Invite } from "../../models/invite.js";
 import { Lookup } from "../../models/lookup.js";
 import { User } from "../../models/user.js";
+import { reconcileChats } from "../chats/service.js";
+import { notify } from "../notify/service.js";
 import {
   canConnect,
   contactJson,
@@ -108,10 +110,12 @@ export function createContactsRouter(config: Config) {
         existing.acceptedAt = new Date();
         await existing.save();
         bus.contactsChanged([user._id, target._id]);
+        void notify(target._id, { kind: "contact_added", title: user.username, body: "accepted your contact request", tag: `contact:${user.id}`, open: { userId: user.id } });
         return res.json({ status: "contact", contact: contactJson(target, existing), ...details });
       }
       await Friendship.create({ ...pair(user._id, target._id), status: "pending", requestedBy: user._id, via: "id" });
       bus.contactsChanged([user._id, target._id]);
+      void notify(target._id, { kind: "contact_request", title: user.username, body: "wants to connect with you", tag: `contact:${user.id}`, open: {} });
       return res.json({ status: "requested", username: target.username, ...details });
     }
 
@@ -129,6 +133,7 @@ export function createContactsRouter(config: Config) {
     );
     await invite.deleteOne();
     bus.contactsChanged([user._id, owner._id]);
+    void notify(owner._id, { kind: "contact_added", title: user.username, body: "used your invite code. You're now contacts.", tag: `contact:${user.id}`, open: { userId: user.id } });
     res.json({ status: "contact", contact: contactJson(owner, friendship), ...details });
   });
 
@@ -148,6 +153,7 @@ export function createContactsRouter(config: Config) {
     f.acceptedAt = new Date();
     await f.save();
     bus.contactsChanged([f.userA, f.userB]);
+    void notify(other._id, { kind: "contact_added", title: me(req).username, body: "accepted your contact request", tag: `contact:${me(req).id}`, open: { userId: me(req).id } });
     res.json({ ok: true });
   });
 
@@ -178,6 +184,7 @@ export function createContactsRouter(config: Config) {
   router.delete("/:userId", async (req, res) => {
     const { f } = await contact(req);
     await f.deleteOne();
+    await reconcileChats([f.userA, f.userB]);
     bus.contactsChanged([f.userA, f.userB]);
     res.json({ ok: true });
   });
@@ -188,6 +195,7 @@ export function createContactsRouter(config: Config) {
     if (String(otherId) === String(me(req)._id)) throw conflict("You can't block yourself.");
     await Block.updateOne({ blockerId: me(req)._id, blockedId: otherId }, { $setOnInsert: { blockerId: me(req)._id, blockedId: otherId } }, { upsert: true });
     await Friendship.deleteOne({ pairKey: pair(me(req)._id, otherId).pairKey });
+    await reconcileChats([me(req)._id, otherId]);
     bus.contactsChanged([me(req)._id, otherId]);
     res.json({ ok: true });
   });

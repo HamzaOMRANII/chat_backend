@@ -33,6 +33,11 @@ const schema = z.object({
     .default("turn:turn.omranisystems.com:3478?transport=udp,turn:turn.omranisystems.com:3478?transport=tcp,turns:turn.omranisystems.com:5349?transport=tcp")
     .transform((s) => s.split(",").map((u) => u.trim()).filter(Boolean)),
 
+  // Web Push (browser notifications). Without the keys, notifications only reach open apps.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default("mailto:admin@omranisystems.com"),
+
   MEDIA_DIR: z.string().default("/var/lib/h-chat/media"),
   MOBILE_BUILDS_DIR: z.string().default("/projects/mobile_builds/h_chat"),
 });

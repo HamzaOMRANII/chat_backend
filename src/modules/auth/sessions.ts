@@ -6,6 +6,7 @@ import type { DeviceSnapshot } from "../../lib/device.js";
 import { bus } from "../../lib/events.js";
 import { unauthorized } from "../../lib/errors.js";
 import { DeviceEvent, type DeviceEventFields } from "../../models/deviceEvent.js";
+import { PushSubscription } from "../../models/pushSubscription.js";
 import { Session, type SessionDoc } from "../../models/session.js";
 import { User, type UserDoc } from "../../models/user.js";
 
@@ -17,12 +18,16 @@ const TTL_SECONDS: Record<SessionKind, number> = {
   admin: 2 * 60 * 60,
 };
 export const COOKIE = { user: "hc_session", admin: "hc_admin" } as const;
-const COOKIE_PATH = { user: "/api", admin: "/api/admin" } as const;
+// The user cookie must also reach /socket.io (live updates on the web), so it covers the whole site.
+const COOKIE_PATH = { user: "/", admin: "/api/admin" } as const;
+// Before 2026-10-16 the user cookie was scoped to /api, which kept it away from the socket
+const LEGACY_USER_COOKIE_PATH = "/api";
 
 const MAX_FAILURES = 5;
 const LOCK_MINUTES = 30;
 
-type TokenPayload = { sid: string; sub: string; kind: SessionKind };
+// use "socket": a short ticket that only opens the live connection (never accepted by the API)
+type TokenPayload = { sid: string; sub: string; kind: SessionKind; use?: "socket" };
 
 /** The Android app has no cookie jar for our domain: it asks for the token in the response body. */
 export const isAppRequest = (req: Request) => req.get("x-client") === "android";
@@ -96,6 +101,8 @@ export async function revokeSession(session: SessionDoc, reason: NonNullable<Ses
   session.revokeReason = reason;
   if (by) session.revokedBy = sessionDevice(by);
   await session.save();
+  // Its browser notifications stop with it
+  await PushSubscription.deleteMany({ sessionId: session._id });
   bus.sessionRevoked({
     sessionId: session.id,
     userId: String(session.userId),
@@ -154,13 +161,20 @@ function cookieOptions(config: Config, kind: SessionKind): CookieOptions {
 /** Web: httpOnly cookie. Android app: the token goes in the JSON body instead. */
 export function deliverToken(req: Request, res: Response, config: Config, kind: SessionKind, token: string) {
   if (isAppRequest(req) && kind !== "admin") return { token };
+  if (kind !== "admin") res.clearCookie(COOKIE.user, { ...withoutMaxAge(cookieOptions(config, kind)), path: LEGACY_USER_COOKIE_PATH });
   res.cookie(kind === "admin" ? COOKIE.admin : COOKIE.user, token, cookieOptions(config, kind));
   return {};
 }
 
+function withoutMaxAge(options: CookieOptions) {
+  const { maxAge: _maxAge, ...rest } = options;
+  return rest;
+}
+
 export function clearToken(res: Response, config: Config, kind: "user" | "admin") {
-  const { maxAge: _maxAge, ...options } = cookieOptions(config, kind);
+  const options = withoutMaxAge(cookieOptions(config, kind));
   res.clearCookie(kind === "admin" ? COOKIE.admin : COOKIE.user, options);
+  if (kind === "user") res.clearCookie(COOKIE.user, { ...options, path: LEGACY_USER_COOKIE_PATH });
 }
 
 export function tokenFromRequest(req: Request, kind: "user" | "admin") {
@@ -175,7 +189,18 @@ export type Authenticated = { user: UserDoc; session: SessionDoc };
  * Resolves the token to a live session and an allowed user. A revoked session answers 401
  * "session_revoked" with the device that replaced it, so the app can show "signed in elsewhere".
  */
-export async function authenticate(config: Config, token: string | undefined, allowed: SessionKind[]): Promise<Authenticated> {
+/**
+ * Web app: a 60-second ticket for the live connection, asked for with the session cookie. The web app connects
+ * with it instead of relying on the browser sending the cookie to /socket.io.
+ */
+export function socketTicket(config: Config, session: SessionDoc) {
+  return jwt.sign({ sid: session.id, sub: String(session.userId), kind: "user", use: "socket" } satisfies TokenPayload, config.JWT_SECRET, {
+    algorithm: "HS256",
+    expiresIn: 60,
+  });
+}
+
+export async function authenticate(config: Config, token: string | undefined, allowed: SessionKind[], opts: { socket?: boolean } = {}): Promise<Authenticated> {
   if (!token) throw unauthorized();
   let payload: TokenPayload;
   try {
@@ -185,6 +210,7 @@ export async function authenticate(config: Config, token: string | undefined, al
     throw unauthorized("Your session ended. Sign in again.", "session_expired");
   }
   if (!allowed.includes(payload.kind)) throw unauthorized();
+  if (payload.use === "socket" && !opts.socket) throw unauthorized();
   const session = await Session.findById(payload.sid);
   if (!session || session.expiresAt < new Date()) throw unauthorized("Your session ended. Sign in again.", "session_expired");
   if (session.revokedAt) {

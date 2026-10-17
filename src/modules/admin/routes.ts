@@ -12,6 +12,8 @@ import { auth, requireAdmin } from "../../middleware/auth.js";
 import { AdminLog } from "../../models/adminLog.js";
 import { Block } from "../../models/block.js";
 import { Category, CHAT_MODES } from "../../models/category.js";
+import { Chat, type ChatFields } from "../../models/chat.js";
+import { Message } from "../../models/message.js";
 import { Friendship, otherUserId } from "../../models/friendship.js";
 import { Invite } from "../../models/invite.js";
 import { Lookup } from "../../models/lookup.js";
@@ -21,6 +23,7 @@ import { User, USER_STATUSES, type UserDoc } from "../../models/user.js";
 import { bus } from "../../lib/events.js";
 import { presence } from "../../realtime/presence.js";
 import { effectiveCategoryId, ensurePersonalId, relatedUserIds, sharedCategoryIds } from "../contacts/service.js";
+import { endChat, reconcileAllChats, reconcileChats } from "../chats/service.js";
 import { checkCode, openChallenge, sendCodeChallenge } from "../auth/routes.js";
 import { clearFailures, clearToken, deliverToken, isLocked, recordEvent, registerFailure, revokeAllSessions, revokeSession, startSession } from "../auth/sessions.js";
 
@@ -200,6 +203,7 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     user.suspendedAt = new Date();
     await user.save();
     await revokeAllSessions(user._id, "suspended");
+    await reconcileChats([user._id]);
     bus.contactsChanged(await relatedUserIds(user._id));
     await log(req, "user.suspended", user._id);
     res.json({ ok: true });
@@ -250,7 +254,9 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     user.categoryIds = await validCategoryIds(categoryIds);
     await user.save();
     // Contacts who no longer share a category are paused (hidden from both), not deleted: see the Contacts tab.
-    bus.contactsChanged([user.id, ...(await relatedUserIds(user._id))]);
+    const related = await relatedUserIds(user._id);
+    await reconcileChats([user._id, ...related]);
+    bus.contactsChanged([user.id, ...related]);
     await log(req, "user.categories_changed", user._id, { before, after: categoryIds });
     res.json({ ok: true });
   });
@@ -268,6 +274,7 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
       Invite.deleteMany({ ownerId: user._id }),
       Lookup.deleteMany({ userId: user._id }),
     ]);
+    await reconcileChats([user._id]); // no contacts left: every chat ends and its messages are deleted
     await user.deleteOne();
     bus.contactsChanged(related);
     await log(req, "user.deleted", user._id, { username: user.username, email: user.email });
@@ -315,6 +322,7 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     if (!a || !b || !sharedCategoryIds(a, b).includes(categoryId)) throw badRequest("Both people must be in this category.", "not_shared");
     f.categoryId = new Types.ObjectId(categoryId);
     await f.save();
+    await reconcileChats([f.userA, f.userB]);
     await log(req, "friendship.category_changed", undefined, { pair: `${a.username} + ${b.username}`, categoryId });
     res.json({ ok: true });
   });
@@ -324,9 +332,149 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     if (!f) throw notFound("Contact not found");
     const [a, b] = await Promise.all([User.findById(f.userA).select("username").lean(), User.findById(f.userB).select("username").lean()]);
     await f.deleteOne();
+    await reconcileChats([f.userA, f.userB]);
     bus.contactsChanged([f.userA, f.userB]);
     await log(req, "friendship.ended", undefined, { pair: `${a?.username ?? "?"} + ${b?.username ?? "?"}` });
     res.json({ ok: true });
+  });
+
+  // ---------- Dashboard ----------
+  router.get("/dashboard", admin, async (_req, res) => {
+    const day = new Date(Date.now() - 24 * 3600_000);
+    const [statusCounts, chatCounts, messages24h, stored, locked, pending, logins, onlineSessions] = await Promise.all([
+      User.aggregate([{ $match: { role: "user" } }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
+      Chat.aggregate([{ $match: { status: { $in: ["invited", "active"] } } }, { $group: { _id: { status: "$status", mode: "$mode" }, n: { $sum: 1 } } }]),
+      Message.countDocuments({ sentAt: { $gt: day } }),
+      Message.aggregate([{ $group: { _id: null, n: { $sum: 1 }, bytes: { $sum: "$size" } } }]),
+      User.find({ role: "user", lockedUntil: { $gt: new Date() } }).select("username lockedUntil").lean(),
+      User.find({ role: "user", status: "pending" }).select("username createdAt").sort({ createdAt: -1 }).limit(5).lean(),
+      DeviceEvent.find({ type: "login" }).sort({ at: -1 }).limit(8).populate("userId", "username role").lean(),
+      Session.find({ kind: "user", revokedAt: null, expiresAt: { $gt: new Date() } }).select("userId device.platform").lean(),
+    ]);
+    const online = onlineSessions.filter((s) => presence.isOnline(s.userId));
+    const count = (status: string, mode?: string) => chatCounts.filter((c) => c._id.status === status && (!mode || c._id.mode === mode)).reduce((a, c) => a + c.n, 0);
+    // Paused contacts: accepted friendships whose pair no longer shares a category
+    const friendships = await Friendship.find({ status: "accepted" }).select("userA userB").lean();
+    const people = await User.find({ _id: { $in: friendships.flatMap((f) => [f.userA, f.userB]) } }).select("categoryIds status").lean();
+    const byId = new Map(people.map((u) => [String(u._id), u]));
+    const paused = friendships.filter((f) => {
+      const a = byId.get(String(f.userA));
+      const b = byId.get(String(f.userB));
+      return !a || !b || a.status !== "approved" || b.status !== "approved" || !sharedCategoryIds(a, b).length;
+    }).length;
+    res.json({
+      users: Object.fromEntries(USER_STATUSES.map((st) => [st, statusCounts.find((c) => c._id === st)?.n ?? 0])),
+      online: { total: online.length, android: online.filter((s) => s.device?.platform === "android").length },
+      chats: { active: count("active"), keep: count("active", "keep"), auto: count("active", "auto"), invited: count("invited") },
+      messages: { last24h: messages24h, stored: stored[0]?.n ?? 0, storedBytes: stored[0]?.bytes ?? 0 },
+      attention: {
+        pending: pending.map((u) => ({ id: String(u._id), username: u.username, at: u.createdAt })),
+        locked: locked.map((u) => ({ id: String(u._id), username: u.username, until: u.lockedUntil })),
+        pausedContacts: paused,
+      },
+      logins: logins
+        .filter((e) => (e.userId as unknown as UserDoc | null)?.role === "user")
+        .slice(0, 5)
+        .map((e) => ({ username: (e.userId as unknown as UserDoc).username, userId: String((e.userId as unknown as UserDoc)._id), at: e.at, deviceName: e.deviceName ?? null, platform: e.platform ?? null })),
+    });
+  });
+
+  // ---------- Chats: metadata only, content is end-to-end encrypted ----------
+  async function chatRows(chats: ChatFields[]) {
+    const users = await User.find({ _id: { $in: chats.flatMap((c) => c.participants) } }).select("username").lean();
+    const names = new Map(users.map((u) => [String(u._id), u.username]));
+    const categories = await Category.find().select("name").lean();
+    const catNames = new Map(categories.map((c) => [String(c._id), c.name]));
+    const stats = await Message.aggregate<{ _id: Types.ObjectId; n: number; bytes: number; oldest: Date }>([
+      { $match: { chatId: { $in: chats.map((c) => c._id) } } },
+      { $group: { _id: "$chatId", n: { $sum: 1 }, bytes: { $sum: "$size" }, oldest: { $min: "$expiresAt" } } },
+    ]);
+    const statsBy = new Map(stats.map((st) => [String(st._id), st]));
+    return chats.map((c) => {
+      const people = c.participants.map((p) => ({ id: String(p), username: names.get(String(p)) ?? "deleted user" }));
+      const st = statsBy.get(String(c._id));
+      return {
+        id: String(c._id),
+        people,
+        label: people.map((p) => p.username).join(" + "),
+        mode: c.mode,
+        retentionMinutes: c.retentionMinutes,
+        status: c.status,
+        category: c.categoryId ? catNames.get(String(c.categoryId)) ?? null : null,
+        startedBy: names.get(String(c.createdBy)) ?? null,
+        invitedAt: c.invitedAt,
+        acceptedAt: c.acceptedAt ?? null,
+        endedAt: c.endedAt ?? null,
+        endReason: c.endReason ?? null,
+        endedBy: c.endedBy ? names.get(String(c.endedBy)) ?? "admin" : null,
+        lastMessageAt: c.lastMessageAt ?? null,
+        messagesSent: c.messageCount ?? 0,
+        stored: { count: st?.n ?? 0, bytes: st?.bytes ?? 0, nextExpiry: st?.oldest ?? null },
+      };
+    });
+  }
+
+  router.get("/chats", admin, async (req, res) => {
+    const q = parse(z.object({ status: z.enum(["active", "invited", "ended"]).default("active"), search: z.string().trim().max(80).optional(), user: objectIdSchema.optional() }), req.query);
+    const filter: Record<string, unknown> = { status: q.status };
+    if (q.user) filter.participants = new Types.ObjectId(q.user);
+    if (q.search) {
+      const re = new RegExp(q.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const ids = await User.find({ username: re }).select("_id").lean();
+      filter.participants = { $in: ids.map((u) => u._id) };
+    }
+    const chats = await Chat.find(filter).sort({ lastMessageAt: -1, invitedAt: -1 }).limit(300).lean<ChatFields[]>();
+    const counts = await Chat.aggregate([{ $group: { _id: "$status", n: { $sum: 1 } } }]);
+    res.json({
+      counts: Object.fromEntries(["active", "invited", "ended"].map((st) => [st, counts.find((c) => c._id === st)?.n ?? 0])),
+      chats: await chatRows(chats),
+    });
+  });
+
+  router.get("/chats/:id", admin, async (req, res) => {
+    const chat = await Chat.findById(parse(objectIdSchema, req.params.id)).lean<ChatFields>();
+    if (!chat) throw notFound("Chat not found");
+    const [row] = await chatRows([chat]);
+    const messages = await Message.find({ chatId: chat._id }).sort({ sentAt: -1 }).limit(30).select("senderId recipientId size sentAt deliveredAt readAt expiresAt").lean();
+    const names = new Map(row!.people.map((p) => [p.id, p.username]));
+    res.json({
+      chat: row,
+      // Never the ciphertext, let alone content: who, when, how big, receipts
+      messages: messages.map((m) => ({
+        id: String(m._id),
+        from: names.get(String(m.senderId)) ?? "?",
+        to: names.get(String(m.recipientId)) ?? "?",
+        size: m.size,
+        sentAt: m.sentAt,
+        deliveredAt: m.deliveredAt ?? null,
+        readAt: m.readAt ?? null,
+        expiresAt: m.expiresAt,
+      })),
+    });
+  });
+
+  // Deletes every stored message and ends the chat for both. Typing "a + b" confirms.
+  router.delete("/chats/:id", admin, async (req, res) => {
+    const { confirm } = parse(z.object({ confirm: z.string() }), req.body);
+    const chat = await Chat.findById(parse(objectIdSchema, req.params.id));
+    if (!chat) throw notFound("Chat not found");
+    const [row] = await chatRows([chat.toObject() as ChatFields]);
+    if (confirm !== row!.label) throw badRequest(`Type "${row!.label}" exactly to confirm.`, "confirm_mismatch");
+    const deleted = await Message.countDocuments({ chatId: chat._id });
+    await endChat(chat, "deleted_by_admin");
+    await log(req, "chat.deleted", undefined, { pair: row!.label, messages: deleted });
+    res.json({ ok: true, deleted });
+  });
+
+  router.delete("/users/:id/chats", admin, async (req, res) => {
+    const { confirm } = parse(z.object({ confirm: z.string() }), req.body);
+    const user = await findUser(req.params.id as string);
+    if (confirm !== user.username) throw badRequest("Type the username exactly to confirm.", "confirm_mismatch");
+    const chats = await Chat.find({ participants: user._id, status: { $in: ["invited", "active"] } });
+    const deleted = await Message.countDocuments({ chatId: { $in: chats.map((c) => c._id) } });
+    for (const chat of chats) await endChat(chat, "deleted_by_admin");
+    await log(req, "user.chats_deleted", user._id, { chats: chats.length, messages: deleted });
+    res.json({ ok: true, chats: chats.length, deleted });
   });
 
   // ---------- Categories ----------
@@ -362,7 +510,8 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     if (body.name) category.name = body.name;
     if (body.rules) category.set("rules", body.rules);
     await category.save();
-    // Existing chats that break tighter rules are ended here once chats exist (M3).
+    // Open chats that break the new rules end now
+    await reconcileAllChats();
     await log(req, "category.updated", undefined, { id: category.id, ...body });
     res.json({ ok: true });
   });
@@ -373,6 +522,8 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
       throw badRequest("Send every category exactly once.");
     }
     await Category.bulkWrite(ids.map((id, i) => ({ updateOne: { filter: { _id: id }, update: { order: i + 1 } } })));
+    // The order picks which shared category applies to a pair: chats that no longer fit end
+    await reconcileAllChats();
     await log(req, "category.reordered", undefined, { ids });
     res.json({ ok: true });
   });
