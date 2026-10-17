@@ -12,7 +12,7 @@ import { User, type UserDoc } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
 import { notify } from "../notify/service.js";
 import { pairOptions } from "../chats/service.js";
-import { droppedSince, endLive, LIVE_INVITE_MINUTES, otherOf, startRunning } from "./service.js";
+import { droppedSince, endLive, expireLive, LIVE_INVITE_MINUTES, otherOf, startRunning } from "./service.js";
 import { badRequest } from "../../lib/errors.js";
 
 const key32 = z.string().regex(/^[A-Za-z0-9+/]{43}=$/, "invalid key");
@@ -28,6 +28,11 @@ export function createLiveRouter(config: Config) {
   async function openLive(req: Request, statuses: ("invited" | "active")[] = ["invited", "active"]): Promise<LiveDoc> {
     const live = await LiveSession.findOne({ _id: new Types.ObjectId(parse(objectIdSchema, req.params.id)), participants: me(req)._id, status: { $in: statuses } });
     if (!live) throw notFound("This live chat has ended.");
+    // The 5 minutes are exact, not "within the next minute"
+    if (live.status === "invited" && live.inviteExpiresAt && live.inviteExpiresAt.getTime() < Date.now()) {
+      await endLive(live, "invite_expired");
+      throw notFound("This live chat has ended.");
+    }
     return live;
   }
 
@@ -58,6 +63,7 @@ export function createLiveRouter(config: Config) {
   }
 
   router.get("/live", async (req, res) => {
+    await expireLive();
     const sessions = await LiveSession.find({ participants: me(req)._id, status: { $in: ["invited", "active"] } });
     res.json({ live: await liveJson(me(req), sessions) });
   });
