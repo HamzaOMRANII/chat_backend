@@ -23,6 +23,8 @@ import { User, USER_STATUSES, type UserDoc } from "../../models/user.js";
 import { bus } from "../../lib/events.js";
 import { presence } from "../../realtime/presence.js";
 import { effectiveCategoryId, ensurePersonalId, relatedUserIds, sharedCategoryIds } from "../contacts/service.js";
+import { endLive } from "../live/service.js";
+import { LiveSession, type LiveFields } from "../../models/liveSession.js";
 import { endChat, reconcileAllChats, reconcileChats } from "../chats/service.js";
 import { checkCode, openChallenge, sendCodeChallenge } from "../auth/routes.js";
 import { clearFailures, clearToken, deliverToken, isLocked, recordEvent, registerFailure, revokeAllSessions, revokeSession, startSession } from "../auth/sessions.js";
@@ -415,8 +417,17 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
   }
 
   router.get("/chats", admin, async (req, res) => {
-    const q = parse(z.object({ status: z.enum(["active", "invited", "ended"]).default("active"), search: z.string().trim().max(80).optional(), user: objectIdSchema.optional() }), req.query);
-    const filter: Record<string, unknown> = { status: q.status };
+    const q = parse(
+      z.object({
+        status: z.enum(["all", "active", "invited", "ended"]).default("active"),
+        search: z.string().trim().max(80).optional(),
+        user: objectIdSchema.optional(),
+        category: objectIdSchema.optional(),
+      }),
+      req.query,
+    );
+    const filter: Record<string, unknown> = q.status === "all" ? {} : { status: q.status };
+    if (q.category) filter.categoryId = new Types.ObjectId(q.category);
     if (q.user) filter.participants = new Types.ObjectId(q.user);
     if (q.search) {
       const re = new RegExp(q.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -464,6 +475,41 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     await endChat(chat, "deleted_by_admin");
     await log(req, "chat.deleted", undefined, { pair: row!.label, messages: deleted });
     res.json({ ok: true, deleted });
+  });
+
+  // ---------- Live chats: who, when, how long. Nothing typed is ever stored. ----------
+  router.get("/live", admin, async (req, res) => {
+    const q = parse(z.object({ category: objectIdSchema.optional() }), req.query);
+    const sessions = await LiveSession.find(q.category ? { categoryId: new Types.ObjectId(q.category) } : {}).sort({ invitedAt: -1 }).limit(300).lean<LiveFields[]>();
+    const users = await User.find({ _id: { $in: sessions.flatMap((s) => s.participants) } }).select("username").lean();
+    const names = new Map(users.map((u) => [String(u._id), u.username]));
+    const categories = await Category.find().select("name").lean();
+    const catNames = new Map(categories.map((c) => [String(c._id), c.name]));
+    const rows = sessions.map((s) => {
+      const people = s.participants.map((p) => names.get(String(p)) ?? "deleted user");
+      return {
+        id: String(s._id),
+        label: people.join(" + "),
+        status: s.status,
+        category: s.categoryId ? catNames.get(String(s.categoryId)) ?? null : null,
+        startedBy: names.get(String(s.createdBy)) ?? null,
+        invitedAt: s.invitedAt,
+        startedAt: s.startedAt ?? null,
+        endedAt: s.endedAt ?? null,
+        endReason: s.endReason ?? null,
+        endedBy: s.endedBy ? names.get(String(s.endedBy)) ?? "admin" : null,
+      };
+    });
+    res.json({ live: rows, now: rows.filter((r) => r.status === "active").length });
+  });
+
+  router.delete("/live/:id", admin, async (req, res) => {
+    const live = await LiveSession.findById(parse(objectIdSchema, req.params.id));
+    if (!live) throw notFound("Live chat not found");
+    const users = await User.find({ _id: { $in: live.participants } }).select("username").lean();
+    await endLive(live, "deleted_by_admin");
+    await log(req, "live.ended", undefined, { pair: users.map((u) => u.username).join(" + ") });
+    res.json({ ok: true });
   });
 
   router.delete("/users/:id/chats", admin, async (req, res) => {

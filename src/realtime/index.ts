@@ -7,6 +7,7 @@ import { Chat } from "../models/chat.js";
 import { User } from "../models/user.js";
 import { authenticate, COOKIE } from "../modules/auth/sessions.js";
 import { relatedUserIds } from "../modules/contacts/service.js";
+import { peerOf, userBack, userDropped } from "../modules/live/service.js";
 import { presence } from "./presence.js";
 
 function cookieToken(header: string | undefined) {
@@ -52,7 +53,10 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
   io.on("connection", (socket) => {
     const userId = socket.data.userId as string;
     void socket.join([`user:${userId}`, `session:${socket.data.sessionId}`]);
-    if (presence.connect(userId)) announcePresence(userId);
+    if (presence.connect(userId)) {
+      announcePresence(userId);
+      void userBack(userId).catch(() => {});
+    }
     // On screen or in the background: decides whether a notification also goes out as a Web Push
     const sessionId = socket.data.sessionId as string;
     presence.visibility(sessionId, socket.id, (socket.handshake.auth as { visible?: unknown }).visible !== false);
@@ -72,9 +76,20 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
         })
         .catch(() => {});
     });
+    // Live chat: what one side types, encrypted on the phone, relayed to the other and never stored
+    socket.on("live", (payload: unknown) => {
+      const p = payload as { sessionId?: unknown; nonce?: unknown; ct?: unknown } | null;
+      if (typeof p?.sessionId !== "string" || !/^[a-f0-9]{24}$/.test(p.sessionId)) return;
+      if (typeof p.nonce !== "string" || p.nonce.length !== 32 || typeof p.ct !== "string" || p.ct.length > 24_000) return;
+      const { sessionId, nonce, ct } = p as { sessionId: string; nonce: string; ct: string };
+      void peerOf(sessionId, userId)
+        .then((peer) => peer && io.to(`user:${peer}`).emit("live", { sessionId, nonce, ct }))
+        .catch(() => {});
+    });
     socket.on("disconnect", () => {
       presence.leave(sessionId, socket.id);
       const wentOffline = presence.disconnect(userId);
+      if (wentOffline) void userDropped(userId).catch(() => {});
       void User.updateOne({ _id: userId }, { lastSeenAt: new Date() })
         .then(() => wentOffline && announcePresence(userId))
         .catch(() => {});
