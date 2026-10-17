@@ -3,10 +3,12 @@ import { bus } from "../../lib/events.js";
 import { logger } from "../../lib/logger.js";
 import { Category } from "../../models/category.js";
 import { AUTO_MINUTES, Chat, RETENTION_MINUTES, type ChatDoc, type StoredMode } from "../../models/chat.js";
+import { LiveSession } from "../../models/liveSession.js";
 import { Friendship, pair } from "../../models/friendship.js";
 import { Message } from "../../models/message.js";
 import { User } from "../../models/user.js";
 import { blockedEitherWay, effectiveCategoryId, sharedCategoryIds } from "../contacts/service.js";
+import { reconcileLive } from "../live/service.js";
 import { notify } from "../notify/service.js";
 
 export const INVITE_HOURS = 24;
@@ -87,6 +89,7 @@ export async function endChat(chat: ChatDoc, reason: string, by?: Types.ObjectId
 export async function reconcileChats(userIds: (Types.ObjectId | string)[]) {
   const ids = [...new Set(userIds.map(String))].map((id) => new Types.ObjectId(id));
   if (!ids.length) return 0;
+  await reconcileLive(ids);
   const open = await Chat.find({ participants: { $in: ids }, status: { $in: ["invited", "active"] } });
   let ended = 0;
   for (const chat of open) {
@@ -104,7 +107,8 @@ export async function reconcileChats(userIds: (Types.ObjectId | string)[]) {
 /** All open chats, for a rules change on a whole category. */
 export async function reconcileAllChats() {
   const open = await Chat.find({ status: { $in: ["invited", "active"] } }).select("participants").lean();
-  return reconcileChats(open.flatMap((c) => c.participants));
+  const live = await LiveSession.find({ status: { $in: ["invited", "active"] } }).select("participants").lean();
+  return reconcileChats([...open, ...live].flatMap((c) => c.participants));
 }
 
 /** Every minute: unanswered invitations expire; chats whose last message is gone (no activity for the retention) end. */

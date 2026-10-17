@@ -11,6 +11,7 @@ import type { Mailer } from "./lib/mailer.js";
 import { createAdminRouter } from "./modules/admin/routes.js";
 import { createAuthRouter } from "./modules/auth/routes.js";
 import { createChatsRouter } from "./modules/chats/routes.js";
+import { createLiveRouter } from "./modules/live/routes.js";
 import { createContactsRouter } from "./modules/contacts/routes.js";
 import { createMeRouter } from "./modules/me/routes.js";
 import { createNotifyRouter } from "./modules/notify/routes.js";
@@ -46,6 +47,8 @@ export function createApp(config: Config, mailer: Mailer) {
   app.use("/api/contacts", createContactsRouter(config));
   // /api/chats/… and /api/keys/identity
   app.use("/api", createChatsRouter(config));
+  // /api/live/…
+  app.use("/api", createLiveRouter(config));
   // /api/notifications/…
   app.use("/api", createNotifyRouter(config));
   app.use("/api/admin", createAdminRouter(config, mailer));
