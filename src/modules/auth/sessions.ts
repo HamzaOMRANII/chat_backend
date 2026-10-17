@@ -26,7 +26,8 @@ const LEGACY_USER_COOKIE_PATH = "/api";
 const MAX_FAILURES = 5;
 const LOCK_MINUTES = 30;
 
-type TokenPayload = { sid: string; sub: string; kind: SessionKind };
+// use "socket": a short ticket that only opens the live connection (never accepted by the API)
+type TokenPayload = { sid: string; sub: string; kind: SessionKind; use?: "socket" };
 
 /** The Android app has no cookie jar for our domain: it asks for the token in the response body. */
 export const isAppRequest = (req: Request) => req.get("x-client") === "android";
@@ -188,7 +189,18 @@ export type Authenticated = { user: UserDoc; session: SessionDoc };
  * Resolves the token to a live session and an allowed user. A revoked session answers 401
  * "session_revoked" with the device that replaced it, so the app can show "signed in elsewhere".
  */
-export async function authenticate(config: Config, token: string | undefined, allowed: SessionKind[]): Promise<Authenticated> {
+/**
+ * Web app: a 60-second ticket for the live connection, asked for with the session cookie. The web app connects
+ * with it instead of relying on the browser sending the cookie to /socket.io.
+ */
+export function socketTicket(config: Config, session: SessionDoc) {
+  return jwt.sign({ sid: session.id, sub: String(session.userId), kind: "user", use: "socket" } satisfies TokenPayload, config.JWT_SECRET, {
+    algorithm: "HS256",
+    expiresIn: 60,
+  });
+}
+
+export async function authenticate(config: Config, token: string | undefined, allowed: SessionKind[], opts: { socket?: boolean } = {}): Promise<Authenticated> {
   if (!token) throw unauthorized();
   let payload: TokenPayload;
   try {
@@ -198,6 +210,7 @@ export async function authenticate(config: Config, token: string | undefined, al
     throw unauthorized("Your session ended. Sign in again.", "session_expired");
   }
   if (!allowed.includes(payload.kind)) throw unauthorized();
+  if (payload.use === "socket" && !opts.socket) throw unauthorized();
   const session = await Session.findById(payload.sid);
   if (!session || session.expiresAt < new Date()) throw unauthorized("Your session ended. Sign in again.", "session_expired");
   if (session.revokedAt) {

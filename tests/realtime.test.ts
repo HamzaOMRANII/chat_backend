@@ -145,3 +145,22 @@ it("accepts the web app's session cookie on the socket (the cookie covers /socke
   });
   socket.close();
 });
+
+it("web app: a 60-second ticket opens the live connection, whatever cookies the browser sends; the API refuses it", async () => {
+  await approvedUser("hamza");
+  const agent = request.agent(url);
+  const step1 = await agent.post("/api/auth/login").send({ username: "hamza", password: PASSWORD, device: device() });
+  await agent.post("/api/auth/verify-code").send({ challengeId: step1.body.challengeId, code: mail.lastCode() }).expect(200);
+  const { ticket } = (await agent.get("/api/auth/socket-ticket").expect(200)).body;
+
+  // No cookie at all on the socket (like a browser holding an old /api-only cookie): the ticket is enough
+  const socket = connect(url, { path: "/socket.io", auth: { ticket }, transports: ["websocket"] });
+  await new Promise<void>((resolve, reject) => {
+    socket.on("connect", () => resolve());
+    socket.on("connect_error", reject);
+  });
+  socket.close();
+
+  expect((await request(url).get("/api/auth/me").set("Authorization", `Bearer ${ticket}`)).status).toBe(401);
+  expect((await request(url).get("/api/auth/socket-ticket")).status).toBe(401);
+});

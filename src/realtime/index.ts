@@ -31,12 +31,14 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
   // Same session as the API: the web app's cookie, or the Android app's token in the handshake.
   io.use(async (socket, next) => {
     try {
-      const token = (socket.handshake.auth as { token?: string }).token ?? cookieToken(socket.handshake.headers.cookie);
-      const { user, session } = await authenticate(config, token, ["user"]);
+      const given = socket.handshake.auth as { token?: string; ticket?: string };
+      const token = given.ticket ?? given.token ?? cookieToken(socket.handshake.headers.cookie);
+      const { user, session } = await authenticate(config, token, ["user"], { socket: true });
       socket.data.userId = user.id;
       socket.data.sessionId = session.id;
       next();
     } catch (err) {
+      logger.warn({ code: (err as { code?: string }).code, how: (socket.handshake.auth as { ticket?: string }).ticket ? "ticket" : (socket.handshake.auth as { token?: string }).token ? "token" : "cookie" }, "socket refused");
       next(Object.assign(new Error("unauthorized"), { data: (err as { details?: unknown }).details }));
     }
   });
