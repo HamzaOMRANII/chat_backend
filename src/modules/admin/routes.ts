@@ -25,6 +25,7 @@ import { presence } from "../../realtime/presence.js";
 import { effectiveCategoryId, ensurePersonalId, relatedUserIds, sharedCategoryIds } from "../contacts/service.js";
 import { endLive } from "../live/service.js";
 import { StoredFile } from "../../models/file.js";
+import { ExportRequest } from "../../models/exportRequest.js";
 import { cleanupFiles, deleteFiles, disk, DISK_LIMIT, lastCleanupResult, QUOTA_BYTES } from "../files/service.js";
 import { notify } from "../notify/service.js";
 import { LiveSession, type LiveFields } from "../../models/liveSession.js";
@@ -451,8 +452,22 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     const [row] = await chatRows([chat]);
     const messages = await Message.find({ chatId: chat._id }).sort({ sentAt: -1 }).limit(30).select("senderId recipientId size sentAt deliveredAt readAt expiresAt").lean();
     const names = new Map(row!.people.map((p) => [p.id, p.username]));
+    const exports = await ExportRequest.find({ chatId: chat._id }).sort({ requestedAt: -1 }).limit(20).lean();
     res.json({
       chat: row,
+      // Who asked, the answer, when it was saved: never what was in it
+      exports: exports.map((e) => ({
+        id: String(e._id),
+        by: names.get(String(e.requestedBy)) ?? "?",
+        approver: names.get(String(e.approverId)) ?? "?",
+        messages: e.messages,
+        media: e.media,
+        period: e.period,
+        status: e.status,
+        requestedAt: e.requestedAt,
+        answeredAt: e.answeredAt ?? null,
+        downloadedAt: e.downloadedAt ?? null,
+      })),
       // Never the ciphertext, let alone content: who, when, how big, receipts
       messages: messages.map((m) => ({
         id: String(m._id),
