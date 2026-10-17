@@ -23,6 +23,8 @@ export const config = loadConfig({
   EMAIL_PORT: "465",
   EMAIL_FROM: "test@example.com",
   EMAIL_PASSWORD: "secret",
+  // Never the real media folder
+  MEDIA_DIR: `${process.env.TMPDIR ?? "/tmp"}/h-chat-test-media`,
 });
 
 /** Captures the codes the server would email. */

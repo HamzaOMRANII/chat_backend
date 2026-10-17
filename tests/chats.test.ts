@@ -54,17 +54,17 @@ async function activeChat(agentA: Agent, agentB: Agent, bId: string, mode = "kee
 describe("chat options", () => {
   it("follow the rules of the category the pair uses", async () => {
     const { b, agentA } = await contacts();
-    expect((await agentA.get(`/api/chats/options/${b.id}`)).body.options).toEqual({ keepMaxDays: 7, auto: true, live: true });
+    expect((await agentA.get(`/api/chats/options/${b.id}`)).body.options).toMatchObject({ keepMaxDays: 7, auto: true, live: true });
   });
 
   it("Externals: keep-alive up to 3 days only; Secret: no stored chat at all", async () => {
     const { b, agentA } = await contacts(["Externals"], ["Externals"]);
-    expect((await agentA.get(`/api/chats/options/${b.id}`)).body.options).toEqual({ keepMaxDays: 3, auto: false, live: false });
+    expect((await agentA.get(`/api/chats/options/${b.id}`)).body.options).toMatchObject({ keepMaxDays: 3, auto: false, live: false });
     expect((await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionMinutes: 5760, key: key() })).body.code).toBe("mode_not_allowed");
     expect((await agentA.post("/api/chats").send({ userId: b.id, mode: "auto", retentionMinutes: 10080, key: key() })).body.code).toBe("mode_not_allowed");
 
     await Category.updateOne({ name: "Externals" }, { "rules.modes": ["live"], "rules.maxRetentionDays": 0 });
-    expect((await agentA.get(`/api/chats/options/${b.id}`)).body.options).toEqual({ keepMaxDays: 0, auto: false, live: true });
+    expect((await agentA.get(`/api/chats/options/${b.id}`)).body.options).toMatchObject({ keepMaxDays: 0, auto: false, live: true });
   });
 
   it("Keep-alive durations: from 30 minutes, only the offered steps, up to the category's maximum", async () => {

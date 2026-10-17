@@ -80,7 +80,7 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
     socket.on("live", (payload: unknown) => {
       const p = payload as { sessionId?: unknown; nonce?: unknown; ct?: unknown } | null;
       if (typeof p?.sessionId !== "string" || !/^[a-f0-9]{24}$/.test(p.sessionId)) return;
-      if (typeof p.nonce !== "string" || p.nonce.length !== 32 || typeof p.ct !== "string" || p.ct.length > 24_000) return;
+      if (typeof p.nonce !== "string" || p.nonce.length !== 32 || typeof p.ct !== "string" || p.ct.length > 60_000) return;
       const { sessionId, nonce, ct } = p as { sessionId: string; nonce: string; ct: string };
       void peerOf(sessionId, userId)
         .then((peer) => peer && io.to(`user:${peer}`).emit("live", { sessionId, nonce, ct }))

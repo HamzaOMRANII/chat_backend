@@ -9,6 +9,7 @@ import { auth, requireUser } from "../../middleware/auth.js";
 import { AUTO_MINUTES, Chat, STORED_MODES, type ChatDoc } from "../../models/chat.js";
 import { pair } from "../../models/friendship.js";
 import { Message } from "../../models/message.js";
+import { StoredFile } from "../../models/file.js";
 import { User, type UserDoc } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
 import { notify, retentionText } from "../notify/service.js";
@@ -214,6 +215,7 @@ export function createChatsRouter(config: Config) {
         deliveredAt: m.deliveredAt ?? null,
         readAt: m.readAt ?? null,
         expiresAt: m.expiresAt,
+        fileId: m.fileId ? String(m.fileId) : null,
       })),
       me: user.id,
     });
@@ -221,7 +223,7 @@ export function createChatsRouter(config: Config) {
 
   router.post("/chats/:id/messages", async (req, res) => {
     const body = parse(
-      z.object({ ciphertext, nonce: nonce24, senderKeyVersion: z.number().int().min(1), recipientKeyVersion: z.number().int().min(1) }),
+      z.object({ ciphertext, nonce: nonce24, senderKeyVersion: z.number().int().min(1), recipientKeyVersion: z.number().int().min(1), fileId: objectIdSchema.optional() }),
       req.body,
     );
     const user = me(req);
@@ -229,6 +231,9 @@ export function createChatsRouter(config: Config) {
     const recipientId = otherId(chat, user._id);
     const has = (userId: Types.ObjectId, version: number) => chat.keys.some((k) => String(k.userId) === String(userId) && k.version === version);
     if (!has(user._id, body.senderKeyVersion) || !has(recipientId, body.recipientKeyVersion)) throw conflict("The chat keys changed. Reload the chat.", "stale_keys");
+    // A file goes with the message once all its pieces are on the server
+    const file = body.fileId ? await StoredFile.findOne({ _id: body.fileId, chatId: chat._id, senderId: user._id, status: "uploading" }) : null;
+    if (body.fileId && (!file || file.got.length !== file.chunks)) throw conflict("The file isn't fully uploaded.", "file_incomplete");
     const sentAt = new Date();
     const size = Math.floor((body.ciphertext.length * 3) / 4);
     const message = await Message.create({
@@ -240,6 +245,12 @@ export function createChatsRouter(config: Config) {
       sentAt,
       expiresAt: new Date(sentAt.getTime() + chat.retentionMinutes * 60_000),
     });
+    if (file) {
+      file.status = "ready";
+      file.messageId = message._id;
+      file.expiresAt = message.expiresAt;
+      await file.save();
+    }
     await Chat.updateOne({ _id: chat._id }, { $set: { lastMessageAt: sentAt }, $inc: { messageCount: 1, storedBytes: size } });
     const json = {
       id: message.id,
@@ -252,10 +263,11 @@ export function createChatsRouter(config: Config) {
       deliveredAt: null,
       readAt: null,
       expiresAt: message.expiresAt,
+      fileId: file ? file.id : null,
     };
     bus.toUsers([recipientId], "msg:new", { chatId: chat.id, message: json });
     // Content is encrypted: the notification only says who wrote
-    void notify(recipientId, { kind: "message", title: user.username, body: "New message", tag: `chat:${chat.id}`, open: { chatId: chat.id } });
+    void notify(recipientId, { kind: "message", title: user.username, body: file ? "sent a file" : "New message", tag: `chat:${chat.id}`, open: { chatId: chat.id } });
     res.status(201).json({ message: json });
   });
 

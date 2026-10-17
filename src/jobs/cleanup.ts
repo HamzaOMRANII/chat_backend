@@ -2,6 +2,7 @@ import { logger } from "../lib/logger.js";
 import { User } from "../models/user.js";
 import { expireChats } from "../modules/chats/service.js";
 import { expireLive } from "../modules/live/service.js";
+import { cleanupFiles } from "../modules/files/service.js";
 
 const REJECTED_KEEP_DAYS = 7;
 
@@ -12,11 +13,12 @@ export async function cleanupOnce() {
   if (deletedCount) logger.info({ deletedCount }, "deleted old rejected requests");
   await expireChats();
   await expireLive();
+  await cleanupFiles();
 }
 
 export function startCleanupJob() {
   const run = () => void cleanupOnce().catch((err) => logger.error({ err }, "cleanup failed"));
-  const chats = () => void Promise.all([expireChats(), expireLive()]).catch((err) => logger.error({ err }, "chat expiry failed"));
+  const chats = () => void Promise.all([expireChats(), expireLive(), cleanupFiles()]).catch((err) => logger.error({ err }, "chat expiry failed"));
   run();
   const hourly = setInterval(run, 60 * 60_000);
   const minutely = setInterval(chats, 60_000);

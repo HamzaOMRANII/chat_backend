@@ -27,6 +27,13 @@ const userSchema = new Schema(
       contacts: { type: Boolean, default: true },
     },
 
+    // The administrator asked this user to download their media before it's deleted
+    mediaRequest: {
+      deadline: Date,
+      requestedAt: Date,
+      reminded: { type: [String], default: undefined },
+    },
+
     privacyAcceptedAt: Date,
     approvedAt: Date,
     approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
