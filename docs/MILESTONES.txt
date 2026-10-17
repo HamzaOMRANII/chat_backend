@@ -95,7 +95,7 @@ M3  STORED CHATS (Keep-alive / Automatic)
                 Not done (your choice): Android notifications when the app is fully closed (Firebase).
 
 M4  LIVE MODE  [x] APPROVED 2026-10-17 (APK 0.5.1)
-    Backend   : live invitation, relay of live typing (never written to disk), end on leave / 30 s offline
+    Backend   : live invitation, relay of live typing (never written to disk), end on leave / 1 min offline
     Chat app  : live chat (text appears while typing, Enter commits, wiped on exit)
     Backoffice: live sessions shown (start, end, duration)
     DONE WHEN : two phones see each other type in real time; Secret contacts get Live only
