@@ -172,7 +172,7 @@ describe("a running live chat", () => {
       expect((await LiveSession.findById(id))!.status).toBe("ended");
       sa.close();
     } finally {
-      liveTiming.dropMs = 30_000;
+      liveTiming.dropMs = 60_000;
     }
   });
 });

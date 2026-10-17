@@ -10,7 +10,7 @@ import { pairOptions } from "../chats/service.js";
 /** A live invitation stays open this long. */
 export const LIVE_INVITE_MINUTES = 5;
 /** Someone whose connection drops has this long to come back before the live chat is wiped. */
-export const LIVE_DROP_SECONDS = 30;
+export const LIVE_DROP_SECONDS = 60;
 /** Milliseconds; a variable only so tests can shorten it. */
 export const liveTiming = { dropMs: LIVE_DROP_SECONDS * 1000 };
 const ENDED_KEEP_DAYS = 30;
@@ -19,7 +19,7 @@ const ENDED_TEXT: Record<string, string> = {
   declined: "declined your live invitation",
   cancelled: "cancelled the live invitation",
   left: "left. Everything was wiped on both phones.",
-  connection_lost: "lost connection. Everything was wiped on both phones.",
+  connection_lost: "lost connection for 1 minute. Everything was wiped on both phones.",
   invite_expired: "The live invitation expired without an answer.",
 };
 
@@ -81,7 +81,7 @@ export async function endLive(live: LiveDoc, reason: string, by?: Types.ObjectId
   }
 }
 
-/** The last socket of this user closed: their running live chats are wiped in 30 s unless they come back. */
+/** The last socket of this user closed: their running live chats are wiped in 1 minute unless they come back. */
 export async function userDropped(userId: string) {
   const live = await LiveSession.find({ participants: userId, status: "active" });
   for (const session of live) {
@@ -99,7 +99,7 @@ export async function userDropped(userId: string) {
   }
 }
 
-/** They are back within the 30 s. */
+/** They are back within the minute. */
 export async function userBack(userId: string) {
   for (const [sessionId, drop] of drops) {
     if (drop.userId !== userId) continue;

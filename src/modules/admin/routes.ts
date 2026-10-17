@@ -417,8 +417,17 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
   }
 
   router.get("/chats", admin, async (req, res) => {
-    const q = parse(z.object({ status: z.enum(["active", "invited", "ended"]).default("active"), search: z.string().trim().max(80).optional(), user: objectIdSchema.optional() }), req.query);
-    const filter: Record<string, unknown> = { status: q.status };
+    const q = parse(
+      z.object({
+        status: z.enum(["all", "active", "invited", "ended"]).default("active"),
+        search: z.string().trim().max(80).optional(),
+        user: objectIdSchema.optional(),
+        category: objectIdSchema.optional(),
+      }),
+      req.query,
+    );
+    const filter: Record<string, unknown> = q.status === "all" ? {} : { status: q.status };
+    if (q.category) filter.categoryId = new Types.ObjectId(q.category);
     if (q.user) filter.participants = new Types.ObjectId(q.user);
     if (q.search) {
       const re = new RegExp(q.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -469,8 +478,9 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
   });
 
   // ---------- Live chats: who, when, how long. Nothing typed is ever stored. ----------
-  router.get("/live", admin, async (_req, res) => {
-    const sessions = await LiveSession.find().sort({ invitedAt: -1 }).limit(300).lean<LiveFields[]>();
+  router.get("/live", admin, async (req, res) => {
+    const q = parse(z.object({ category: objectIdSchema.optional() }), req.query);
+    const sessions = await LiveSession.find(q.category ? { categoryId: new Types.ObjectId(q.category) } : {}).sort({ invitedAt: -1 }).limit(300).lean<LiveFields[]>();
     const users = await User.find({ _id: { $in: sessions.flatMap((s) => s.participants) } }).select("username").lean();
     const names = new Map(users.map((u) => [String(u._id), u.username]));
     const categories = await Category.find().select("name").lean();
