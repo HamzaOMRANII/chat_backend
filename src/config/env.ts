@@ -38,6 +38,9 @@ const schema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:admin@omranisystems.com"),
 
+  // Firebase service account (Android notifications when the app is closed); missing file = off
+  FIREBASE_SERVICE_ACCOUNT: z.string().default("/root/.hchat/firebase-service-account.json"),
+
   MEDIA_DIR: z.string().default("/var/lib/h-chat/media"),
   MOBILE_BUILDS_DIR: z.string().default("/projects/mobile_builds/h_chat"),
 });

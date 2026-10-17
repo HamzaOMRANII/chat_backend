@@ -6,8 +6,9 @@ import { logger } from "../../lib/logger.js";
 import { PushSubscription } from "../../models/pushSubscription.js";
 import { User } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
+import { sendFcm } from "./fcm.js";
 
-export type NotifyKind = "contact_request" | "contact_added" | "chat_invite" | "chat_accepted" | "chat_declined" | "chat_ended" | "live_invite" | "media_request" | "export_request" | "export_answer" | "message";
+export type NotifyKind = "contact_request" | "contact_added" | "chat_invite" | "chat_accepted" | "chat_declined" | "chat_ended" | "live_invite" | "media_request" | "export_request" | "export_answer" | "call" | "message";
 /** Which setting turns each kind's system notification on or off. */
 const PREF: Record<NotifyKind, "messages" | "chats" | "contacts"> = {
   contact_request: "contacts",
@@ -20,6 +21,7 @@ const PREF: Record<NotifyKind, "messages" | "chats" | "contacts"> = {
   media_request: "chats",
   export_request: "chats",
   export_answer: "chats",
+  call: "chats",
   message: "messages",
 };
 
@@ -49,9 +51,13 @@ export async function notify(userId: Types.ObjectId | string, n: Omit<Notificati
   try {
     const user = await User.findById(userId).select("notify activeSessionId status").lean();
     if (!user || user.status !== "approved") return;
-    const system = user.notify?.[PREF[n.kind]] !== false;
+    // A ringing call always reaches the phone (the "Receive calls" setting is what turns calls off)
+    const system = n.kind === "call" && n.body.startsWith("Incoming") ? true : user.notify?.[PREF[n.kind]] !== false;
     bus.toUsers([userId], "notify", { ...n, system });
-    if (!system || !pushReady || !user.activeSessionId || presence.onScreen(user.activeSessionId)) return;
+    if (!system || !user.activeSessionId || presence.onScreen(user.activeSessionId)) return;
+    // Android app closed or in the background: Firebase (generic text only)
+    void sendFcm(String(user.activeSessionId), { kind: n.kind, tag: n.tag, url: openUrl(n.open), body: n.body }).catch((err) => logger.warn({ err }, "firebase failed"));
+    if (!pushReady) return;
     const subs = await PushSubscription.find({ userId, sessionId: user.activeSessionId }).lean();
     const payload = JSON.stringify({ title: n.title, body: n.body, tag: n.tag, url: openUrl(n.open) });
     await Promise.all(

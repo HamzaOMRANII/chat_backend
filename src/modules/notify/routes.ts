@@ -2,8 +2,10 @@ import { Router, type Request } from "express";
 import { z } from "zod";
 import type { Config } from "../../config/env.js";
 import { parse } from "../../lib/validate.js";
+import { logger } from "../../lib/logger.js";
 import { auth, requireUser } from "../../middleware/auth.js";
 import { PushSubscription } from "../../models/pushSubscription.js";
+import { FcmToken } from "../../models/fcmToken.js";
 
 const b64url = z.string().regex(/^[A-Za-z0-9_-]+={0,2}$/).max(200);
 const subscription = z.object({ endpoint: z.url().startsWith("https://").max(1000), keys: z.object({ p256dh: b64url, auth: b64url }) });
@@ -40,6 +42,25 @@ export function createNotifyRouter(config: Config) {
       { userId: user._id, sessionId: session._id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
       { upsert: true },
     );
+    res.json({ ok: true });
+  });
+
+  // The Android app's Firebase token, for this session only
+  router.post("/notifications/fcm", async (req, res) => {
+    const { token } = parse(z.object({ token: z.string().min(20).max(4096) }), req.body);
+    const { user, session } = auth(req);
+    await FcmToken.findOneAndUpdate({ token }, { userId: user._id, sessionId: session._id, token }, { upsert: true });
+    res.json({ ok: true });
+  });
+  // What the phone says about its Firebase registration (to find out why notifications don't arrive)
+  router.post("/notifications/fcm-status", (req, res) => {
+    const body = parse(z.object({ state: z.enum(["off", "on", "error"]), detail: z.string().max(300).default("") }), req.body);
+    logger.info({ user: me(req).username, platform: auth(req).session.device?.platform, ...body }, "firebase registration on the phone");
+    res.json({ ok: true });
+  });
+  router.delete("/notifications/fcm", async (req, res) => {
+    const { token } = parse(z.object({ token: z.string().max(4096) }), req.body);
+    await FcmToken.deleteOne({ token, userId: me(req)._id });
     res.json({ ok: true });
   });
 

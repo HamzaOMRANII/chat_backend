@@ -8,6 +8,7 @@ import { User } from "../models/user.js";
 import { authenticate, COOKIE } from "../modules/auth/sessions.js";
 import { relatedUserIds } from "../modules/contacts/service.js";
 import { peerOf, userBack, userDropped } from "../modules/live/service.js";
+import { answerCall, callOf, leaveCall, ringAgain, startCall, userBack as callBack, userDropped as callDropped } from "../modules/calls/service.js";
 import { presence } from "./presence.js";
 
 function cookieToken(header: string | undefined) {
@@ -56,6 +57,7 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
     if (presence.connect(userId)) {
       announcePresence(userId);
       void userBack(userId).catch(() => {});
+      callBack(userId);
     }
     // On screen or in the background: decides whether a notification also goes out as a Web Push
     const sessionId = socket.data.sessionId as string;
@@ -86,10 +88,42 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
         .then((peer) => peer && io.to(`user:${peer}`).emit("live", { sessionId, nonce, ct }))
         .catch(() => {});
     });
+    void ringAgain(userId, (p) => socket.emit("call:incoming", p)).catch(() => {});
+    // Calls: ringing, answering, leaving, and the WebRTC offer/answer/candidates relayed between the devices
+    const isId = (v: unknown): v is string => typeof v === "string" && /^[a-f0-9]{24}$/.test(v);
+    const reply = (ack: unknown, data: unknown) => typeof ack === "function" && ack(data);
+    socket.on("call:start", (payload: unknown, ack?: unknown) => {
+      const p = payload as { to?: unknown; kind?: unknown } | null;
+      if (!isId(p?.to) || (p.kind !== "voice" && p.kind !== "video")) return reply(ack, { error: "bad_request" });
+      void startCall(userId, p.to, p.kind)
+        .then((r) => reply(ack, r))
+        .catch(() => reply(ack, { error: "failed" }));
+    });
+    socket.on("call:answer", (payload: unknown, ack?: unknown) => {
+      const callId = (payload as { callId?: unknown } | null)?.callId;
+      if (!isId(callId)) return reply(ack, { ok: false });
+      void answerCall(callId, userId)
+        .then((ok) => reply(ack, { ok }))
+        .catch(() => reply(ack, { ok: false }));
+    });
+    socket.on("call:leave", (payload: unknown) => {
+      const p = payload as { callId?: unknown; everyone?: unknown } | null;
+      if (isId(p?.callId)) void leaveCall(p.callId, userId, p.everyone === true).catch(() => {});
+    });
+    socket.on("call:signal", (payload: unknown) => {
+      const p = payload as { callId?: unknown; to?: unknown; data?: unknown } | null;
+      if (!isId(p?.callId) || !isId(p.to) || typeof p.data !== "object" || !p.data) return;
+      const c = callOf(p.callId, userId);
+      if (!c || !c.participants.includes(p.to) || JSON.stringify(p.data).length > 30_000) return;
+      io.to(`user:${p.to}`).emit("call:signal", { callId: p.callId, from: userId, data: p.data });
+    });
     socket.on("disconnect", () => {
       presence.leave(sessionId, socket.id);
       const wentOffline = presence.disconnect(userId);
-      if (wentOffline) void userDropped(userId).catch(() => {});
+      if (wentOffline) {
+        void userDropped(userId).catch(() => {});
+        callDropped(userId);
+      }
       void User.updateOne({ _id: userId }, { lastSeenAt: new Date() })
         .then(() => wentOffline && announcePresence(userId))
         .catch(() => {});

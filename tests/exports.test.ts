@@ -78,4 +78,17 @@ describe("exports", () => {
     const { agentA, chatId } = await chatBetween(["Confidential"]);
     expect((await agentA.post(`/api/chats/${chatId}/exports`).send({ messages: true, media: true, period: "all" })).status).toBe(201);
   });
+
+  it("the backoffice deletes selected chats, or all, for good (messages, exports, records)", async () => {
+    const { chatId } = await chatBetween();
+    const { Chat } = await import("../src/models/chat.js");
+    const { Message } = await import("../src/models/message.js");
+    const adm = await adminAgent(app, mail);
+    expect((await adm.post("/api/admin/chats/purge").send({ confirm: "no", ids: [chatId] })).status).toBe(400);
+    const done = (await adm.post("/api/admin/chats/purge").send({ confirm: "DELETE", ids: [chatId] })).body;
+    expect(done).toMatchObject({ chats: 1, messages: 3 });
+    expect(await Chat.countDocuments()).toBe(0);
+    expect(await Message.countDocuments()).toBe(0);
+    expect((await adm.post("/api/admin/chats/purge").send({ confirm: "DELETE", all: {} })).body).toMatchObject({ chats: 0 });
+  });
 });

@@ -50,7 +50,9 @@ outer.post("/__seed", async (_req, res) => {
   res.json({ ok: true });
 });
 outer.use(express.static(join(import.meta.dirname, "../../../chat_app/dist")));
-outer.use(createApp({ ...config, APP_ORIGIN: `http://127.0.0.1:${port}` }, mail.mailer));
+// E2E_TURN_SECRET: the real relay's secret, to test calls through turn.omranisystems.com
+const e2eConfig = { ...config, APP_ORIGIN: `http://127.0.0.1:${port}`, ...(process.env.E2E_TURN_SECRET ? { TURN_SECRET: process.env.E2E_TURN_SECRET } : {}) };
+outer.use(createApp(e2eConfig, mail.mailer));
 const server = createServer(outer);
-createRealtime(server, { ...config, APP_ORIGIN: `http://127.0.0.1:${port}` });
+createRealtime(server, e2eConfig);
 server.listen(port, "127.0.0.1", () => console.log(`e2e server on http://127.0.0.1:${port}`));
