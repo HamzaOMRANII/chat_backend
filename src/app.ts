@@ -15,6 +15,7 @@ import { createLiveRouter } from "./modules/live/routes.js";
 import { createFilesRouter } from "./modules/files/routes.js";
 import { createExportsRouter } from "./modules/exports/routes.js";
 import { createCallsRouter } from "./modules/calls/routes.js";
+import { createGroupsRouter } from "./modules/groups/routes.js";
 import { configureMedia } from "./modules/files/service.js";
 import { configureFcm } from "./modules/notify/fcm.js";
 import { createContactsRouter } from "./modules/contacts/routes.js";
@@ -60,6 +61,8 @@ export function createApp(config: Config, mailer: Mailer) {
   app.use("/api", createFilesRouter(config));
   // /api/chats/:id/exports, /api/exports/…
   app.use("/api", createExportsRouter(config));
+  // /api/groups/…
+  app.use("/api", createGroupsRouter(config));
   // /api/live/…
   app.use("/api", createLiveRouter(config));
   // /api/notifications/…

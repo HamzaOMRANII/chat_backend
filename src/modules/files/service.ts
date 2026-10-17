@@ -5,6 +5,7 @@ import { bus } from "../../lib/events.js";
 import { logger } from "../../lib/logger.js";
 import { StoredFile, type FileDoc } from "../../models/file.js";
 import { User } from "../../models/user.js";
+import { Group } from "../../models/group.js";
 import { notify } from "../notify/service.js";
 
 /** One file at most 100 MB (plain), each user's files at most 2 GB, uploads stop when the disk is 80 % full. */
@@ -60,11 +61,16 @@ export async function deleteFiles(files: FileDoc[], reason: string, by?: string)
     file.deletedReason = reason;
     file.purgeAt = new Date(Date.now() + KEEP_DELETED_HOURS * 3600_000);
     await file.save();
-    const entry = byChat.get(String(file.chatId)) ?? { ids: [], people: [String(file.senderId), String(file.recipientId)] };
+    const where = file.groupId ? `group:${String(file.groupId)}` : String(file.chatId);
+    const people = file.groupId ? ((await Group.findById(file.groupId).select("members").lean())?.members.map(String) ?? [String(file.senderId)]) : [String(file.senderId), String(file.recipientId)];
+    const entry = byChat.get(where) ?? { ids: [], people };
     entry.ids.push(file.id);
-    byChat.set(String(file.chatId), entry);
+    byChat.set(where, entry);
   }
-  for (const [chatId, { ids, people }] of byChat) bus.toUsers(people, "files:deleted", { chatId, fileIds: ids, reason, by: by ?? null });
+  for (const [where, { ids, people }] of byChat) {
+    const place = where.startsWith("group:") ? { groupId: where.slice(6) } : { chatId: where };
+    bus.toUsers(people, "files:deleted", { ...place, fileIds: ids, reason, by: by ?? null });
+  }
   return files.length;
 }
 

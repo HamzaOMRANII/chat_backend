@@ -10,9 +10,11 @@ export const FILE_KINDS = ["image", "video", "audio", "document", "archive", "ot
  */
 const fileSchema = new Schema(
   {
-    chatId: { type: Schema.Types.ObjectId, ref: "Chat", required: true, index: true },
+    // A stored chat's file, or a group's (then every member may fetch it)
+    chatId: { type: Schema.Types.ObjectId, ref: "Chat", index: true },
+    groupId: { type: Schema.Types.ObjectId, ref: "Group", index: true },
     senderId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    recipientId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    recipientId: { type: Schema.Types.ObjectId, ref: "User" },
     kind: { type: String, enum: FILE_KINDS, required: true },
     // Encrypted size on disk (all pieces), and how many pieces
     size: { type: Number, required: true },

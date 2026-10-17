@@ -35,7 +35,7 @@ export type Notification = {
   body: string;
   /** Same tag = replaces the previous notification (one per chat for messages). */
   tag: string;
-  open: { chatId?: string; userId?: string; liveId?: string; media?: boolean };
+  open: { chatId?: string; userId?: string; liveId?: string; media?: boolean; groupId?: string };
   /** False when the person turned this kind off: in-app banner only, no system notification. */
   system: boolean;
 };
@@ -75,7 +75,7 @@ export async function notify(userId: Types.ObjectId | string, n: Omit<Notificati
 }
 
 /** Where a tap on a browser notification opens the app. */
-export const openUrl = (open: Notification["open"]) => (open.chatId ? `/#chat=${open.chatId}` : open.liveId ? `/#live=${open.liveId}` : open.media ? "/#media=all" : open.userId ? `/#contact=${open.userId}` : "/");
+export const openUrl = (open: Notification["open"]) => (open.chatId ? `/#chat=${open.chatId}` : open.liveId ? `/#live=${open.liveId}` : open.media ? "/#media=all" : open.groupId ? `/#group=${open.groupId}` : open.userId ? `/#contact=${open.userId}` : "/");
 
 /** "30 min", "6 hours", "2 days" */
 export const retentionText = (minutes: number) =>

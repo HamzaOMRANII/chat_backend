@@ -4,6 +4,7 @@ import type { Config } from "../config/env.js";
 import { bus } from "../lib/events.js";
 import { logger } from "../lib/logger.js";
 import { Chat } from "../models/chat.js";
+import { Group } from "../models/group.js";
 import { User } from "../models/user.js";
 import { authenticate, COOKIE } from "../modules/auth/sessions.js";
 import { relatedUserIds } from "../modules/contacts/service.js";
@@ -116,6 +117,15 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
       const c = callOf(p.callId, userId);
       if (!c || !c.participants.includes(p.to) || JSON.stringify(p.data).length > 30_000) return;
       io.to(`user:${p.to}`).emit("call:signal", { callId: p.callId, from: userId, data: p.data });
+    });
+    socket.on("group:typing", (payload: unknown) => {
+      const groupId = (payload as { groupId?: unknown } | null)?.groupId;
+      if (!isId(groupId)) return;
+      void Group.findOne({ _id: groupId, members: userId, status: "active" })
+        .select("members")
+        .lean()
+        .then((g) => g && io.to(g.members.filter((m) => String(m) !== userId).map((m) => `user:${String(m)}`)).emit("group:typing", { groupId, userId }))
+        .catch(() => {});
     });
     socket.on("disconnect", () => {
       presence.leave(sessionId, socket.id);
