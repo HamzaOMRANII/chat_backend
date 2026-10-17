@@ -23,6 +23,9 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
     cors: { origin: [config.APP_ORIGIN, config.NATIVE_APP_ORIGIN, config.ADMIN_ORIGIN], credentials: true },
     // Live-mode drafts are small; keep frames small so nobody can push large payloads
     maxHttpBufferSize: 64 * 1024,
+    // Phones drop connections silently (sleep, network change): notice within ~20 s instead of ~45 s
+    pingInterval: 10_000,
+    pingTimeout: 10_000,
   });
 
   // Same session as the API: the web app's cookie, or the Android app's token in the handshake.
@@ -52,6 +55,8 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
     const sessionId = socket.data.sessionId as string;
     presence.visibility(sessionId, socket.id, (socket.handshake.auth as { visible?: unknown }).visible !== false);
     socket.on("visibility", (payload: unknown) => presence.visibility(sessionId, socket.id, (payload as { visible?: unknown } | null)?.visible !== false));
+    // The app checks the connection is really alive when it comes back on screen
+    socket.on("alive", (_payload: unknown, ack?: unknown) => typeof ack === "function" && ack(true));
     // "is typing…": relayed to the other participant of an active chat, never stored
     socket.on("typing", (payload: unknown) => {
       const chatId = (payload as { chatId?: unknown } | null)?.chatId;
