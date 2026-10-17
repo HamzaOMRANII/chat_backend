@@ -123,7 +123,7 @@ M7  VOICE AND VIDEO CALLS
     Chat app  : call screen (mute, camera, switch camera, hang up), Android mic/camera permissions
     DONE WHEN : calls work on Wi-Fi and on mobile data (through the relay)
     APK       : v0.8
-    Status    : [ ] not started
+    Status    : [x] APPROVED 2026-10-18 (APK 0.8.10) — all categories, receive-calls setting, devices, Firebase ringing, call service
 
 M8  GROUPS (admin only)
     Backend   : groups created by admin, group keys replaced when a member leaves, category rules
