@@ -30,6 +30,18 @@ outer.use((_req, res, next) => {
 });
 outer.get("/__codes", (_req, res) => res.json(mail.sent));
 // Exactly what the database holds for messages, to check that no plaintext reaches the server
+outer.get("/__files", async (_req, res) => res.json(await mongoose.connection.db!.collection("files").find({ status: "ready" }).toArray()));
+// Every piece on disk, and whether it contains a PNG header in clear (it never should)
+outer.get("/__media", async (_req, res) => {
+  const { readdir, readFile } = await import("node:fs/promises");
+  const out: { piece: string; includesPlain: boolean }[] = [];
+  for (const dir of await readdir(config.MEDIA_DIR).catch(() => [] as string[]))
+    for (const n of await readdir(`${config.MEDIA_DIR}/${dir}`).catch(() => [] as string[])) {
+      const data = await readFile(`${config.MEDIA_DIR}/${dir}/${n}`);
+      out.push({ piece: `${dir}/${n}`, includesPlain: data.includes(Buffer.from([0x89, 0x50, 0x4e, 0x47])) });
+    }
+  res.json(out);
+});
 outer.get("/__messages", async (_req, res) => res.json(await mongoose.connection.db!.collection("messages").find().toArray()));
 // Two approved contacts-to-be in Friends (password "correct horse battery")
 outer.post("/__seed", async (_req, res) => {
