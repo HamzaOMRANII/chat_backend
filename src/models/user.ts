@@ -27,6 +27,9 @@ const userSchema = new Schema(
       contacts: { type: Boolean, default: true },
     },
 
+    // Off: nobody can call this user; callers are told they aren't taking calls (never why)
+    receiveCalls: { type: Boolean, default: true },
+
     // The administrator asked this user to download their media before it's deleted
     mediaRequest: {
       deadline: Date,

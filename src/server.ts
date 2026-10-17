@@ -10,6 +10,7 @@ import { seedCategories } from "./models/category.js";
 import { Chat } from "./models/chat.js";
 import { User } from "./models/user.js";
 import { resetLive } from "./modules/live/service.js";
+import { resetCalls } from "./modules/calls/service.js";
 import { ensurePersonalId } from "./modules/contacts/service.js";
 
 const config = loadConfig();
@@ -24,6 +25,7 @@ await Chat.collection.updateMany({ retentionMinutes: { $exists: false }, retenti
   { $unset: "retentionDays" },
 ]);
 await resetLive();
+await resetCalls();
 logger.info("connected to MongoDB");
 
 const httpServer = createServer(createApp(config, createMailer(config)));

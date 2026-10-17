@@ -7,7 +7,7 @@ import { PushSubscription } from "../../models/pushSubscription.js";
 import { User } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
 
-export type NotifyKind = "contact_request" | "contact_added" | "chat_invite" | "chat_accepted" | "chat_declined" | "chat_ended" | "live_invite" | "media_request" | "export_request" | "export_answer" | "message";
+export type NotifyKind = "contact_request" | "contact_added" | "chat_invite" | "chat_accepted" | "chat_declined" | "chat_ended" | "live_invite" | "media_request" | "export_request" | "export_answer" | "call" | "message";
 /** Which setting turns each kind's system notification on or off. */
 const PREF: Record<NotifyKind, "messages" | "chats" | "contacts"> = {
   contact_request: "contacts",
@@ -20,6 +20,7 @@ const PREF: Record<NotifyKind, "messages" | "chats" | "contacts"> = {
   media_request: "chats",
   export_request: "chats",
   export_answer: "chats",
+  call: "chats",
   message: "messages",
 };
 

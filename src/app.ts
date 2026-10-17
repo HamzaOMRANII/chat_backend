@@ -14,6 +14,7 @@ import { createChatsRouter } from "./modules/chats/routes.js";
 import { createLiveRouter } from "./modules/live/routes.js";
 import { createFilesRouter } from "./modules/files/routes.js";
 import { createExportsRouter } from "./modules/exports/routes.js";
+import { createCallsRouter } from "./modules/calls/routes.js";
 import { configureMedia } from "./modules/files/service.js";
 import { createContactsRouter } from "./modules/contacts/routes.js";
 import { createMeRouter } from "./modules/me/routes.js";
@@ -46,6 +47,8 @@ export function createApp(config: Config, mailer: Mailer) {
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", createAuthRouter(config, mailer));
+  // /api/calls/turn, /api/me/calls (before /api/me)
+  app.use("/api", createCallsRouter(config));
   app.use("/api/me", createMeRouter(config, mailer));
   app.use("/api/contacts", createContactsRouter(config));
   // /api/chats/… and /api/keys/identity
