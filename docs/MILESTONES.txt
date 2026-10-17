@@ -116,7 +116,7 @@ M6  EXPORT
     Chat app  : export button, approval card, zip built on the device
     DONE WHEN : the zip opens and holds only what was approved
     APK       : v0.7
-    Status    : [ ] not started
+    Status    : [x] APPROVED 2026-10-17 (APK 0.7.1) — export allowed in every category, with approval
 
 M7  VOICE AND VIDEO CALLS
     Backend   : call setup between devices, TURN credentials, identity check against eavesdropping
