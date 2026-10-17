@@ -6,6 +6,7 @@ import { logger } from "../../lib/logger.js";
 import { PushSubscription } from "../../models/pushSubscription.js";
 import { User } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
+import { sendFcm } from "./fcm.js";
 
 export type NotifyKind = "contact_request" | "contact_added" | "chat_invite" | "chat_accepted" | "chat_declined" | "chat_ended" | "live_invite" | "media_request" | "export_request" | "export_answer" | "call" | "message";
 /** Which setting turns each kind's system notification on or off. */
@@ -52,7 +53,10 @@ export async function notify(userId: Types.ObjectId | string, n: Omit<Notificati
     if (!user || user.status !== "approved") return;
     const system = user.notify?.[PREF[n.kind]] !== false;
     bus.toUsers([userId], "notify", { ...n, system });
-    if (!system || !pushReady || !user.activeSessionId || presence.onScreen(user.activeSessionId)) return;
+    if (!system || !user.activeSessionId || presence.onScreen(user.activeSessionId)) return;
+    // Android app closed or in the background: Firebase (generic text only)
+    void sendFcm(String(user.activeSessionId), { kind: n.kind, tag: n.tag, url: openUrl(n.open), body: n.body }).catch((err) => logger.warn({ err }, "firebase failed"));
+    if (!pushReady) return;
     const subs = await PushSubscription.find({ userId, sessionId: user.activeSessionId }).lean();
     const payload = JSON.stringify({ title: n.title, body: n.body, tag: n.tag, url: openUrl(n.open) });
     await Promise.all(

@@ -8,7 +8,7 @@ import { User } from "../models/user.js";
 import { authenticate, COOKIE } from "../modules/auth/sessions.js";
 import { relatedUserIds } from "../modules/contacts/service.js";
 import { peerOf, userBack, userDropped } from "../modules/live/service.js";
-import { answerCall, callOf, leaveCall, startCall, userBack as callBack, userDropped as callDropped } from "../modules/calls/service.js";
+import { answerCall, callOf, leaveCall, ringAgain, startCall, userBack as callBack, userDropped as callDropped } from "../modules/calls/service.js";
 import { presence } from "./presence.js";
 
 function cookieToken(header: string | undefined) {
@@ -88,6 +88,7 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
         .then((peer) => peer && io.to(`user:${peer}`).emit("live", { sessionId, nonce, ct }))
         .catch(() => {});
     });
+    void ringAgain(userId, (p) => socket.emit("call:incoming", p)).catch(() => {});
     // Calls: ringing, answering, leaving, and the WebRTC offer/answer/candidates relayed between the devices
     const isId = (v: unknown): v is string => typeof v === "string" && /^[a-f0-9]{24}$/.test(v);
     const reply = (ack: unknown, data: unknown) => typeof ack === "function" && ack(data);

@@ -104,6 +104,15 @@ export function userDropped(userId: string) {
     );
   }
 }
+/** A device that just connected (the app opened from the call notification) still gets the ringing call. */
+export async function ringAgain(userId: string, emit: (payload: unknown) => void) {
+  for (const [callId, c] of running) {
+    if (c.active || c.startedBy === userId || !c.participants.includes(userId)) continue;
+    const from = await User.findById(c.startedBy).select("username identity").lean();
+    emit({ callId, kind: c.kind, from: { id: c.startedBy, username: from?.username ?? "?", identityPub: from?.identity?.signPub ?? null } });
+  }
+}
+
 export function userBack(userId: string) {
   for (const [key, timer] of drops) {
     if (!key.endsWith(`:${userId}`)) continue;

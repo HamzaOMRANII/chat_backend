@@ -4,6 +4,7 @@ import type { Config } from "../../config/env.js";
 import { parse } from "../../lib/validate.js";
 import { auth, requireUser } from "../../middleware/auth.js";
 import { PushSubscription } from "../../models/pushSubscription.js";
+import { FcmToken } from "../../models/fcmToken.js";
 
 const b64url = z.string().regex(/^[A-Za-z0-9_-]+={0,2}$/).max(200);
 const subscription = z.object({ endpoint: z.url().startsWith("https://").max(1000), keys: z.object({ p256dh: b64url, auth: b64url }) });
@@ -40,6 +41,19 @@ export function createNotifyRouter(config: Config) {
       { userId: user._id, sessionId: session._id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
       { upsert: true },
     );
+    res.json({ ok: true });
+  });
+
+  // The Android app's Firebase token, for this session only
+  router.post("/notifications/fcm", async (req, res) => {
+    const { token } = parse(z.object({ token: z.string().min(20).max(4096) }), req.body);
+    const { user, session } = auth(req);
+    await FcmToken.findOneAndUpdate({ token }, { userId: user._id, sessionId: session._id, token }, { upsert: true });
+    res.json({ ok: true });
+  });
+  router.delete("/notifications/fcm", async (req, res) => {
+    const { token } = parse(z.object({ token: z.string().max(4096) }), req.body);
+    await FcmToken.deleteOne({ token, userId: me(req)._id });
     res.json({ ok: true });
   });
 

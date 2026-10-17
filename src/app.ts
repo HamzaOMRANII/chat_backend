@@ -16,6 +16,7 @@ import { createFilesRouter } from "./modules/files/routes.js";
 import { createExportsRouter } from "./modules/exports/routes.js";
 import { createCallsRouter } from "./modules/calls/routes.js";
 import { configureMedia } from "./modules/files/service.js";
+import { configureFcm } from "./modules/notify/fcm.js";
 import { createContactsRouter } from "./modules/contacts/routes.js";
 import { createMeRouter } from "./modules/me/routes.js";
 import { createNotifyRouter } from "./modules/notify/routes.js";
@@ -55,6 +56,7 @@ export function createApp(config: Config, mailer: Mailer) {
   app.use("/api", createChatsRouter(config));
   // /api/files/…, /api/media, /api/chats/:id/files
   configureMedia(config.MEDIA_DIR);
+  void configureFcm(config.NODE_ENV === "test" ? undefined : config.FIREBASE_SERVICE_ACCOUNT);
   app.use("/api", createFilesRouter(config));
   // /api/chats/:id/exports, /api/exports/…
   app.use("/api", createExportsRouter(config));
