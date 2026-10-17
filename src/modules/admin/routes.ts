@@ -483,6 +483,40 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
   });
 
   // Deletes every stored message and ends the chat for both. Typing "a + b" confirms.
+  // Removes chats for good: open ones end first (messages deleted for both), then every trace goes: the chat record,
+  // its files on disk, its exports. Live chats too. Typing "DELETE" confirms. Frees database and disk space.
+  router.post("/chats/purge", admin, async (req, res) => {
+    const body = parse(
+      z.object({
+        confirm: z.literal("DELETE", { message: 'Type "DELETE" to confirm.' }),
+        ids: z.array(objectIdSchema).max(5000).default([]),
+        liveIds: z.array(objectIdSchema).max(5000).default([]),
+        all: z.object({ category: objectIdSchema.optional() }).optional(),
+      }),
+      req.body,
+    );
+    const byCategory = body.all?.category ? { categoryId: new Types.ObjectId(body.all.category) } : {};
+    const chats = await Chat.find(body.all ? byCategory : { _id: { $in: body.ids } });
+    const lives = await LiveSession.find(body.all ? byCategory : { _id: { $in: body.liveIds } });
+    let messages = 0;
+    let bytes = 0;
+    for (const chat of chats) {
+      messages += await Message.countDocuments({ chatId: chat._id });
+      if (chat.status !== "ended") await endChat(chat, "deleted_by_admin");
+      const files = await StoredFile.find({ chatId: chat._id });
+      bytes += files.filter((f) => f.status !== "deleted").reduce((a, f) => a + f.size, 0);
+      await deleteFiles(files, "removed_by_admin");
+      await Promise.all([Message.deleteMany({ chatId: chat._id }), StoredFile.deleteMany({ chatId: chat._id }), ExportRequest.deleteMany({ chatId: chat._id })]);
+      await Chat.deleteOne({ _id: chat._id });
+    }
+    for (const live of lives) {
+      if (live.status !== "ended") await endLive(live, "deleted_by_admin");
+      await LiveSession.deleteOne({ _id: live._id });
+    }
+    await log(req, "chats.purged", undefined, { chats: chats.length, live: lives.length, messages, bytes, all: Boolean(body.all) });
+    res.json({ chats: chats.length, live: lives.length, messages, bytes });
+  });
+
   router.delete("/chats/:id", admin, async (req, res) => {
     const { confirm } = parse(z.object({ confirm: z.string() }), req.body);
     const chat = await Chat.findById(parse(objectIdSchema, req.params.id));
