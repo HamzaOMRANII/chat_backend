@@ -9,13 +9,15 @@ import { Message } from "../../models/message.js";
 import { User } from "../../models/user.js";
 import { blockedEitherWay, effectiveCategoryId, sharedCategoryIds } from "../contacts/service.js";
 import { reconcileLive } from "../live/service.js";
+import { deleteFiles } from "../files/service.js";
+import { StoredFile } from "../../models/file.js";
 import { notify } from "../notify/service.js";
 
 export const INVITE_HOURS = 24;
 export const ENDED_KEEP_DAYS = 30;
 const AUTO_DAYS = AUTO_MINUTES / 1440;
 
-export type ChatOptions = { keepMaxDays: number; auto: boolean; live: boolean };
+export type ChatOptions = { keepMaxDays: number; auto: boolean; live: boolean; files: "all" | "p2p" | "none"; export: boolean };
 
 /**
  * What two users may open together, from the rules of the category their contact uses. null = they aren't
@@ -40,6 +42,9 @@ export async function pairOptions(aId: Types.ObjectId | string, bId: Types.Objec
     keepMaxDays: modes.includes("keep") ? max : 0,
     auto: modes.includes("auto") && max >= AUTO_DAYS,
     live: modes.includes("live"),
+    // "all": stored chats and live chats; "p2p": only straight to the other phone in a live chat
+    files: (category.rules?.files ?? "none") as ChatOptions["files"],
+    export: Boolean(category.rules?.export),
   };
 }
 
@@ -70,6 +75,7 @@ export async function endChat(chat: ChatDoc, reason: string, by?: Types.ObjectId
   chat.set("keys", []);
   await chat.save();
   await Message.deleteMany({ chatId: chat._id });
+  await deleteFiles(await StoredFile.find({ chatId: chat._id, status: { $ne: "deleted" } }), "chat_ended");
   bus.toUsers(chat.participants, "chat:ended", { chatId: chat.id, reason, by: by ? String(by) : null });
 
   const people = await User.find({ _id: { $in: chat.participants } }).select("username").lean();

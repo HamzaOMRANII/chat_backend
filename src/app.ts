@@ -12,6 +12,8 @@ import { createAdminRouter } from "./modules/admin/routes.js";
 import { createAuthRouter } from "./modules/auth/routes.js";
 import { createChatsRouter } from "./modules/chats/routes.js";
 import { createLiveRouter } from "./modules/live/routes.js";
+import { createFilesRouter } from "./modules/files/routes.js";
+import { configureMedia } from "./modules/files/service.js";
 import { createContactsRouter } from "./modules/contacts/routes.js";
 import { createMeRouter } from "./modules/me/routes.js";
 import { createNotifyRouter } from "./modules/notify/routes.js";
@@ -47,6 +49,9 @@ export function createApp(config: Config, mailer: Mailer) {
   app.use("/api/contacts", createContactsRouter(config));
   // /api/chats/… and /api/keys/identity
   app.use("/api", createChatsRouter(config));
+  // /api/files/…, /api/media, /api/chats/:id/files
+  configureMedia(config.MEDIA_DIR);
+  app.use("/api", createFilesRouter(config));
   // /api/live/…
   app.use("/api", createLiveRouter(config));
   // /api/notifications/…

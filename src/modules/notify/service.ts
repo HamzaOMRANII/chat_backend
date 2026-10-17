@@ -7,7 +7,7 @@ import { PushSubscription } from "../../models/pushSubscription.js";
 import { User } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
 
-export type NotifyKind = "contact_request" | "contact_added" | "chat_invite" | "chat_accepted" | "chat_declined" | "chat_ended" | "live_invite" | "message";
+export type NotifyKind = "contact_request" | "contact_added" | "chat_invite" | "chat_accepted" | "chat_declined" | "chat_ended" | "live_invite" | "media_request" | "message";
 /** Which setting turns each kind's system notification on or off. */
 const PREF: Record<NotifyKind, "messages" | "chats" | "contacts"> = {
   contact_request: "contacts",
@@ -17,6 +17,7 @@ const PREF: Record<NotifyKind, "messages" | "chats" | "contacts"> = {
   chat_declined: "chats",
   chat_ended: "chats",
   live_invite: "chats",
+  media_request: "chats",
   message: "messages",
 };
 
@@ -30,7 +31,7 @@ export type Notification = {
   body: string;
   /** Same tag = replaces the previous notification (one per chat for messages). */
   tag: string;
-  open: { chatId?: string; userId?: string; liveId?: string };
+  open: { chatId?: string; userId?: string; liveId?: string; media?: boolean };
   /** False when the person turned this kind off: in-app banner only, no system notification. */
   system: boolean;
 };
@@ -66,7 +67,7 @@ export async function notify(userId: Types.ObjectId | string, n: Omit<Notificati
 }
 
 /** Where a tap on a browser notification opens the app. */
-export const openUrl = (open: Notification["open"]) => (open.chatId ? `/#chat=${open.chatId}` : open.liveId ? `/#live=${open.liveId}` : open.userId ? `/#contact=${open.userId}` : "/");
+export const openUrl = (open: Notification["open"]) => (open.chatId ? `/#chat=${open.chatId}` : open.liveId ? `/#live=${open.liveId}` : open.media ? "/#media=all" : open.userId ? `/#contact=${open.userId}` : "/");
 
 /** "30 min", "6 hours", "2 days" */
 export const retentionText = (minutes: number) =>

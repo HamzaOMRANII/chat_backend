@@ -13,6 +13,8 @@ const messageSchema = new Schema({
   senderKeyVersion: { type: Number, required: true },
   recipientKeyVersion: { type: Number, required: true },
   size: { type: Number, required: true },
+  // A file sent with this message (its key and name are inside the ciphertext)
+  fileId: { type: Schema.Types.ObjectId, ref: "File" },
   sentAt: { type: Date, default: () => new Date() },
   deliveredAt: Date,
   readAt: Date,
