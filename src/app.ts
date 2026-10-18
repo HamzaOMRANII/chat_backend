@@ -2,7 +2,8 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { rateLimit } from "express-rate-limit";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
+import { COOKIE } from "./modules/auth/sessions.js";
 import { pinoHttp } from "pino-http";
 import type { Config } from "./config/env.js";
 import { HttpError } from "./lib/errors.js";
@@ -15,6 +16,7 @@ import { createLiveRouter } from "./modules/live/routes.js";
 import { createFilesRouter } from "./modules/files/routes.js";
 import { createExportsRouter } from "./modules/exports/routes.js";
 import { createCallsRouter } from "./modules/calls/routes.js";
+import { appConfigRouter } from "./modules/appConfig.js";
 import { createGroupsRouter } from "./modules/groups/routes.js";
 import { configureMedia } from "./modules/files/service.js";
 import { configureFcm } from "./modules/notify/fcm.js";
@@ -42,12 +44,29 @@ export function createApp(config: Config, mailer: Mailer) {
   );
   app.use(express.json({ limit: "64kb" }));
   app.use(cookieParser());
+  // Signed in: 600 requests a minute per session (a whole office behind one address isn't blocked together).
+  // Not signed in: 120 a minute per address. Sign-in, sign-up and ID searches have their own, stricter limits.
+  const sessionKey = (req: express.Request) => {
+    const header = req.headers.authorization?.replace(/^Bearer /, "");
+    const cookie = (req.cookies as Record<string, string> | undefined)?.[COOKIE.user] ?? (req.cookies as Record<string, string> | undefined)?.[COOKIE.admin];
+    const token = header || cookie;
+    // The token's signature part identifies the session without decoding it here
+    return token ? `s:${token.slice(-24)}` : null;
+  };
   app.use(
     "/api",
-    rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }),
+    rateLimit({
+      windowMs: 60_000,
+      limit: (req) => (sessionKey(req) ? 600 : 120),
+      keyGenerator: (req) => sessionKey(req) ?? `ip:${ipKeyGenerator(req.ip ?? "")}`,
+      standardHeaders: "draft-8",
+      legacyHeaders: false,
+      message: { error: "Too many requests. Wait a minute and try again.", code: "rate_limited" },
+    }),
   );
 
   app.use("/api/health", healthRouter);
+  app.use("/api/app/config", appConfigRouter);
   app.use("/api/auth", createAuthRouter(config, mailer));
   // /api/calls/turn, /api/me/calls (before /api/me)
   app.use("/api", createCallsRouter(config));

@@ -28,6 +28,7 @@ import { StoredFile } from "../../models/file.js";
 import { Group, GROUP_MAX_MEMBERS, type GroupDoc, type GroupFields } from "../../models/group.js";
 import { deleteGroup, dropMember, systemLine } from "../groups/service.js";
 import { AUTO_MINUTES } from "../../models/chat.js";
+import { getSetting, setSetting } from "../../models/setting.js";
 import { ExportRequest } from "../../models/exportRequest.js";
 import { cleanupFiles, deleteFiles, disk, DISK_LIMIT, lastCleanupResult, QUOTA_BYTES } from "../files/service.js";
 import { notify } from "../notify/service.js";
@@ -842,8 +843,27 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
   });
 
   // ---------- Activity log ----------
-  router.get("/logs", admin, async (_req, res) => {
-    const logs = await AdminLog.find().sort({ at: -1 }).limit(300).populate("adminId", "username").populate("targetUserId", "username").lean();
+  // Filters: action, admin, a target or detail text; pages of 100 (before = the last row's time)
+  router.get("/logs", admin, async (req, res) => {
+    const q = parse(
+      z.object({ action: z.string().max(60).optional(), admin: z.string().max(60).optional(), q: z.string().trim().max(80).optional(), before: z.string().datetime().optional() }),
+      req.query,
+    );
+    const filter: Record<string, unknown> = {};
+    if (q.action) filter.action = q.action.endsWith(".") ? { $regex: `^${q.action.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}` } : q.action;
+    if (q.before) filter.at = { $lt: new Date(q.before) };
+    if (q.admin) {
+      const a = await User.findOne({ username: q.admin.toLowerCase() }).select("_id").lean();
+      filter.adminId = a?._id ?? new Types.ObjectId();
+    }
+    if (q.q) {
+      const re = new RegExp(q.q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const users = await User.find({ username: re }).select("_id").lean();
+      filter.$or = [{ targetUserId: { $in: users.map((u) => u._id) } }, { "details.name": re }, { "details.pair": re }];
+    }
+    const logs = await AdminLog.find(filter).sort({ at: -1 }).limit(100).populate("adminId", "username").populate("targetUserId", "username").lean();
+    const [actions, admins] = await Promise.all([AdminLog.distinct("action"), AdminLog.distinct("adminId")]);
+    const adminNames = await User.find({ _id: { $in: admins } }).select("username").lean();
     res.json({
       logs: logs.map((l) => ({
         id: String(l._id),
@@ -853,7 +873,88 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
         target: (l.targetUserId as unknown as UserDoc | null)?.username ?? null,
         details: l.details ?? null,
       })),
+      more: logs.length === 100,
+      actions: actions.sort(),
+      admins: adminNames.map((a) => a.username).sort(),
     });
+  });
+
+  // ---------- Settings, backup and restore (never messages: they're end-to-end encrypted) ----------
+  router.get("/settings", admin, async (_req, res) => {
+    res.json({ minAppVersion: await getSetting("minAppVersion", "0.0.0") });
+  });
+
+  router.put("/settings", admin, async (req, res) => {
+    const { minAppVersion } = parse(z.object({ minAppVersion: z.string().regex(/^\d+\.\d+\.\d+$/, "Use a version like 1.0.0") }), req.body);
+    await setSetting("minAppVersion", minAppVersion);
+    await log(req, "settings.min_version", undefined, { minAppVersion });
+    res.json({ minAppVersion });
+  });
+
+  /** Everything the backoffice configures: categories and their rules, groups and their members, settings. */
+  router.get("/backup", admin, async (req, res) => {
+    const [categories, groups] = await Promise.all([Category.find().sort({ order: 1 }).lean(), Group.find({ status: "active" }).lean()]);
+    const users = await User.find({ _id: { $in: groups.flatMap((g) => g.members) } }).select("username").lean();
+    const name = (id: unknown) => users.find((u) => String(u._id) === String(id))?.username;
+    const backup = {
+      app: "H_CHAT",
+      kind: "settings-backup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings: { minAppVersion: await getSetting("minAppVersion", "0.0.0") },
+      categories: categories.map((c) => ({ name: c.name, order: c.order, rules: c.rules })),
+      groups: groups.map((g) => ({
+        name: g.name,
+        category: categories.find((c) => String(c._id) === String(g.categoryId))?.name ?? null,
+        retentionMinutes: g.retentionMinutes,
+        members: g.members.map(name).filter(Boolean),
+      })),
+    };
+    await log(req, "settings.backup", undefined, { categories: backup.categories.length, groups: backup.groups.length });
+    res.setHeader("Content-Disposition", `attachment; filename="h_chat-settings-${backup.exportedAt.slice(0, 10)}.json"`);
+    res.json(backup);
+  });
+
+  /** Puts a backup back: categories by name (rules updated), settings, groups that don't exist yet. */
+  router.post("/restore", admin, async (req, res) => {
+    const body = parse(
+      z.object({
+        confirm: z.literal("RESTORE", { message: 'Type "RESTORE" to confirm.' }),
+        backup: z.object({
+          app: z.literal("H_CHAT"),
+          kind: z.literal("settings-backup"),
+          settings: z.object({ minAppVersion: z.string().regex(/^\d+\.\d+\.\d+$/) }).partial().optional(),
+          categories: z.array(z.object({ name: z.string().min(1).max(40), order: z.number().int().optional(), rules: z.record(z.string(), z.unknown()) })).max(50),
+          groups: z.array(z.object({ name: z.string().min(1).max(60), category: z.string().nullable(), retentionMinutes: z.number().int().nullable(), members: z.array(z.string()).max(20) })).max(500).default([]),
+        }),
+      }),
+      req.body,
+    );
+    const b = body.backup;
+    let categories = 0;
+    for (const c of b.categories) {
+      const parsed = parse(rulesSchema, c.rules);
+      await Category.updateOne({ name: c.name }, { $set: { rules: parsed, ...(c.order !== undefined ? { order: c.order } : {}) } }, { upsert: true });
+      categories++;
+    }
+    if (b.settings?.minAppVersion) await setSetting("minAppVersion", b.settings.minAppVersion);
+    let groups = 0;
+    const skipped: string[] = [];
+    for (const g of b.groups) {
+      if (await Group.exists({ name: g.name, status: "active" })) continue;
+      const category = g.category ? await Category.findOne({ name: g.category }).lean() : null;
+      const members = await User.find({ username: { $in: g.members }, role: "user", status: "approved" }).select("_id").lean();
+      if (!category || !g.retentionMinutes || members.length < 2) {
+        skipped.push(g.name);
+        continue;
+      }
+      const created = await Group.create({ name: g.name, status: "active", categoryId: category._id, mode: g.retentionMinutes === AUTO_MINUTES ? "auto" : "keep", retentionMinutes: g.retentionMinutes, members: members.map((m) => m._id).slice(0, GROUP_MAX_MEMBERS), createdBy: auth(req).user._id });
+      await systemLine(created, "created");
+      groups++;
+    }
+    await reconcileAllChats();
+    await log(req, "settings.restore", undefined, { categories, groups, skipped: skipped.length });
+    res.json({ categories, groups, skipped });
   });
 
   return router;
