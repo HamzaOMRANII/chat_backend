@@ -8,6 +8,7 @@ import { presence } from "../../realtime/presence.js";
 import { pairOptions } from "../chats/service.js";
 import { notify } from "../notify/service.js";
 import { FcmToken } from "../../models/fcmToken.js";
+import { Group } from "../../models/group.js";
 
 /** A call rings this long, and a participant whose connection drops has this long to come back. */
 export const callTiming = { ringMs: 45_000, dropMs: 30_000 };
@@ -20,12 +21,30 @@ export function turnCredentials(config: Config, userId: string) {
   return { urls: config.TURN_URLS, username, credential, ttl: 3600 };
 }
 
-type Running = { participants: string[]; startedBy: string; kind: "voice" | "video"; active: boolean; timer?: NodeJS.Timeout };
+type Running = {
+  participants: string[];
+  startedBy: string;
+  kind: "voice" | "video";
+  active: boolean;
+  timer?: NodeJS.Timeout;
+  /** Group calls: the group, and who is in the call right now (the others were rung and may still join). */
+  groupId?: string;
+  joined?: Set<string>;
+};
+/** At most this many people at once in a group call (every device connects to every other). */
+export const GROUP_CALL_MAX = 6;
 /** Calls in progress: who is in them (signals are relayed without a database read). Several people are possible. */
 const running = new Map<string, Running>();
 const drops = new Map<string, NodeJS.Timeout>();
 
 export const inCall = (userId: string) => [...running.values()].some((c) => c.participants.includes(userId));
+/** A group's running call, for its members ("Join the call"). */
+export function groupCall(groupId: string) {
+  for (const [callId, c] of running) if (c.groupId === groupId) return { callId, kind: c.kind, startedBy: c.startedBy, joined: [...(c.joined ?? [])] };
+  return null;
+}
+const announceGroupCall = (c: Running) => c.groupId && bus.toUsers(c.participants, "group:call", { groupId: c.groupId, call: groupCall(c.groupId) });
+
 export const callOf = (callId: string, userId: string) => {
   const c = running.get(callId);
   return c && c.participants.includes(userId) ? c : null;
@@ -46,6 +65,7 @@ export async function endCall(callId: string, reason: string, by?: string | null
     await call.save();
   }
   bus.toUsers(c.participants, "call:ended", { callId, reason, by: by ?? null });
+  if (c.groupId) bus.toUsers(c.participants, "group:call", { groupId: c.groupId, call: null });
   if (reason === "missed") {
     const caller = await User.findById(c.startedBy).select("username").lean();
     for (const p of c.participants.filter((p) => p !== c.startedBy)) {
@@ -73,6 +93,54 @@ export async function startCall(fromId: string, toId: string, kind: "voice" | "v
   return { callId: id, peer: { id: toId, username: to.username, identityPub: to.identity?.signPub ?? null } };
 }
 
+/**
+ * Starts a call in a group: every member taking calls is rung. Members join while it runs; the newcomer connects
+ * to those already in. Only the one who started it can end it for everyone.
+ */
+export async function startGroupCall(fromId: string, groupId: string, kind: "voice" | "video"): Promise<{ callId: string; group: { id: string; name: string } } | { error: string }> {
+  const group = await Group.findOne({ _id: groupId, members: fromId, status: "active" }).lean();
+  if (!group) return { error: "not_member" };
+  if (groupCall(groupId)) return { error: "already_running" };
+  if (inCall(fromId)) return { error: "busy" };
+  const members = group.members.map(String);
+  const from = await User.findById(fromId).select("username identity").lean();
+  const people = await User.find({ _id: { $in: members.filter((m) => m !== fromId) } }).select("receiveCalls").lean();
+  const ring = people.filter((p) => p.receiveCalls !== false).map((p) => String(p._id));
+  const call = await Call.create({ participants: members, startedBy: fromId, kind, status: "ringing" });
+  const id = call.id as string;
+  const c: Running = { participants: members, startedBy: fromId, kind, active: false, groupId, joined: new Set([fromId]) };
+  // Nobody joined in time: the call ends (missed for everyone)
+  c.timer = setTimeout(() => void endCall(id, "missed").catch(() => {}), callTiming.ringMs);
+  running.set(id, c);
+  const info = { id: String(group._id), name: group.name };
+  bus.toUsers(ring, "call:incoming", { callId: id, kind, from: { id: fromId, username: from?.username ?? "?", identityPub: from?.identity?.signPub ?? null }, group: info });
+  for (const m of ring) void notify(m, { kind: "call", title: group.name, body: `Incoming ${kind} call from ${from?.username ?? "a member"}`, tag: `call:${id}`, open: { groupId } });
+  announceGroupCall(c);
+  return { callId: id, group: info };
+}
+
+/** Joining a group call: who is already in (the newcomer connects to each of them). */
+export async function joinGroupCall(callId: string, userId: string) {
+  const c = callOf(callId, userId);
+  if (!c?.groupId || !c.joined || c.joined.has(userId)) return { ok: false as const };
+  if (c.joined.size >= GROUP_CALL_MAX) return { ok: false as const, full: true };
+  const already = [...c.joined];
+  c.joined.add(userId);
+  if (!c.active) {
+    c.active = true;
+    if (c.timer) clearTimeout(c.timer);
+    await Call.updateOne({ _id: callId }, { status: "active", answeredAt: new Date() });
+  }
+  const people = await User.find({ _id: { $in: [...already, userId] } }).select("username identity").lean();
+  const info = (id: string) => {
+    const p = people.find((x) => String(x._id) === id);
+    return { id, username: p?.username ?? "?", identityPub: p?.identity?.signPub ?? null };
+  };
+  bus.toUsers(already, "call:joined", { callId, user: info(userId) });
+  announceGroupCall(c);
+  return { ok: true as const, joined: already.map(info), startedBy: c.startedBy };
+}
+
 export async function answerCall(callId: string, userId: string) {
   const c = callOf(callId, userId);
   if (!c || c.active || userId === c.startedBy) return false;
@@ -87,6 +155,17 @@ export async function answerCall(callId: string, userId: string) {
 export async function leaveCall(callId: string, userId: string, everyone = false) {
   const c = callOf(callId, userId);
   if (!c) return;
+  if (c.groupId && c.joined) {
+    // Group: the starter may end it for everyone; anyone else just leaves (or ignores the ringing)
+    if (everyone && userId === c.startedBy) return endCall(callId, "ended_by_starter", userId);
+    if (!c.joined.has(userId)) return;
+    c.joined.delete(userId);
+    bus.toUsers([...c.joined], "call:left", { callId, userId });
+    // Nobody left to talk to: over
+    if (c.joined.size === 0 || (c.active && c.joined.size === 1)) return endCall(callId, "everyone_left", userId);
+    announceGroupCall(c);
+    return;
+  }
   if (!c.active && userId !== c.startedBy) return endCall(callId, "declined", userId);
   if (c.participants.length <= 2 || (everyone && userId === c.startedBy)) return endCall(callId, c.active ? "hung_up" : "cancelled", userId);
   c.participants = c.participants.filter((p) => p !== userId);
@@ -109,6 +188,7 @@ export function userDropped(userId: string) {
 /** A device that just connected (the app opened from the call notification) still gets the ringing call. */
 export async function ringAgain(userId: string, emit: (payload: unknown) => void) {
   for (const [callId, c] of running) {
+    if (c.groupId) continue;
     if (c.active || c.startedBy === userId || !c.participants.includes(userId)) continue;
     const from = await User.findById(c.startedBy).select("username identity").lean();
     emit({ callId, kind: c.kind, from: { id: c.startedBy, username: from?.username ?? "?", identityPub: from?.identity?.signPub ?? null } });

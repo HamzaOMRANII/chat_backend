@@ -13,6 +13,7 @@ import { User, type UserDoc } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
 import { notify } from "../notify/service.js";
 import { dropMember, systemLine } from "./service.js";
+import { groupCall } from "../calls/service.js";
 import { Friendship, pair } from "../../models/friendship.js";
 
 const key32 = z.string().regex(/^[A-Za-z0-9+/]{43}=$/, "invalid key");
@@ -56,6 +57,7 @@ export function createGroupsRouter(config: Config) {
         }),
         keys: g.keys.map((k) => ({ userId: String(k.userId), version: k.version, pub: k.pub, sig: k.sig, identityPub: k.identityPub })),
         lastMessageAt: g.lastMessageAt ?? null,
+        call: groupCall(g.id),
         unread: unread.find((u) => String(u._id) === g.id)?.n ?? 0,
       };
     });

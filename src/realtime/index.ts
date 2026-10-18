@@ -9,7 +9,7 @@ import { User } from "../models/user.js";
 import { authenticate, COOKIE } from "../modules/auth/sessions.js";
 import { relatedUserIds } from "../modules/contacts/service.js";
 import { peerOf, userBack, userDropped } from "../modules/live/service.js";
-import { answerCall, callOf, leaveCall, ringAgain, startCall, userBack as callBack, userDropped as callDropped } from "../modules/calls/service.js";
+import { answerCall, callOf, joinGroupCall, leaveCall, ringAgain, startCall, startGroupCall, userBack as callBack, userDropped as callDropped } from "../modules/calls/service.js";
 import { presence } from "./presence.js";
 
 function cookieToken(header: string | undefined) {
@@ -94,7 +94,12 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
     const isId = (v: unknown): v is string => typeof v === "string" && /^[a-f0-9]{24}$/.test(v);
     const reply = (ack: unknown, data: unknown) => typeof ack === "function" && ack(data);
     socket.on("call:start", (payload: unknown, ack?: unknown) => {
-      const p = payload as { to?: unknown; kind?: unknown } | null;
+      const p = payload as { to?: unknown; kind?: unknown; groupId?: unknown } | null;
+      if (isId(p?.groupId) && (p.kind === "voice" || p.kind === "video")) {
+        return void startGroupCall(userId, p.groupId, p.kind)
+          .then((r) => reply(ack, r))
+          .catch(() => reply(ack, { error: "failed" }));
+      }
       if (!isId(p?.to) || (p.kind !== "voice" && p.kind !== "video")) return reply(ack, { error: "bad_request" });
       void startCall(userId, p.to, p.kind)
         .then((r) => reply(ack, r))
@@ -107,6 +112,13 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
         .then((ok) => reply(ack, { ok }))
         .catch(() => reply(ack, { ok: false }));
     });
+    socket.on("call:join", (payload: unknown, ack?: unknown) => {
+      const callId = (payload as { callId?: unknown } | null)?.callId;
+      if (!isId(callId)) return reply(ack, { ok: false });
+      void joinGroupCall(callId, userId)
+        .then((r) => reply(ack, r))
+        .catch(() => reply(ack, { ok: false }));
+    });
     socket.on("call:leave", (payload: unknown) => {
       const p = payload as { callId?: unknown; everyone?: unknown } | null;
       if (isId(p?.callId)) void leaveCall(p.callId, userId, p.everyone === true).catch(() => {});
@@ -116,6 +128,7 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
       if (!isId(p?.callId) || !isId(p.to) || typeof p.data !== "object" || !p.data) return;
       const c = callOf(p.callId, userId);
       if (!c || !c.participants.includes(p.to) || JSON.stringify(p.data).length > 30_000) return;
+      if (c.joined && (!c.joined.has(userId) || !c.joined.has(p.to))) return;
       io.to(`user:${p.to}`).emit("call:signal", { callId: p.callId, from: userId, data: p.data });
     });
     socket.on("group:typing", (payload: unknown) => {
