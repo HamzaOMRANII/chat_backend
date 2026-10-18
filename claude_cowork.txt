@@ -63,6 +63,22 @@ TESTS
   Browser     npx tsx tests/e2e/server.ts 4790 in chat_backend (test DB, fake mail, /__seed, /__group…),
               Playwright scripts in the session scratchpad; stop with kill $(lsof -t -i:4790)
 
+EFFORT AND TOKENS (whole project, measured 2026-10-18 from git and this session's transcript)
+-------------------------------------------------------------------------------------------
+  Calendar time   ~38.5 h  (2026-10-16 12:20 → 2026-10-18 02:56 Paris time, nights and breaks included)
+  Active time     ~18.4 h  (counting only pauses under 30 min; includes the user's phone tests)
+  Commits         chat_backend 52 · chat_app 78 · chat_backoffice 26
+  Code            ~5,100 + ~9,800 + ~3,700 lines; tests ~2,100 + ~870 + ~350 lines (102 + 31 + 9 tests)
+  Milestones      9 (M0–M9), ~45 design screens on the canvas, APKs 0.1 → 1.0.0
+
+  Tokens          output (code + replies)           1.35 million
+                  context written to the cache      2.28 million
+                  context re-read from the cache  415.8  million  (99% of the total, billed at a fraction)
+                  fresh input                        2,316
+                  total                          ≈ 419.5  million
+  Model calls     1,154 for 115 user messages (Opus 5.5: 1,132 · Sonnet 5.5: 20)
+  Tip             shorter sessions (one per milestone, or /compact between milestones) cut the re-read volume a lot.
+
 OPEN IDEAS (not started)
 ------------------------
   - Full-screen ring over the lock screen for incoming calls (Android ConnectionService / full-screen intent)
