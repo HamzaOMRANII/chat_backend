@@ -131,7 +131,7 @@ M8  GROUPS (admin only)
     Backoffice: groups screen
     DONE WHEN : a removed member cannot read new messages
     APK       : v0.9
-    Status    : [ ] not started
+    Status    : [x] APPROVED 2026-10-18 (APK 0.9.2) — max 10 members, user requests with admin approval, group calls up to 6
 
 M9  FINISH -> RELEASE 1.0
     Backend   : security review, rate-limit tuning, settings backup, activity log
