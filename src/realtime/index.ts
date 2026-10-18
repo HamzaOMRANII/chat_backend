@@ -54,6 +54,24 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
 
   io.on("connection", (socket) => {
     const userId = socket.data.userId as string;
+    // Flood guard: about 200 events a second (a live chat sending a file is the busiest); a device that keeps
+    // going far beyond is disconnected
+    let tokens = 400;
+    let refilled = Date.now();
+    let dropped = 0;
+    socket.use((_packet, next) => {
+      const now = Date.now();
+      tokens = Math.min(400, tokens + ((now - refilled) / 1000) * 200);
+      refilled = now;
+      if (tokens >= 1) {
+        tokens -= 1;
+        return next();
+      }
+      if (++dropped > 2000) {
+        logger.warn({ userId }, "socket flood: disconnected");
+        socket.disconnect(true);
+      }
+    });
     void socket.join([`user:${userId}`, `session:${socket.data.sessionId}`]);
     if (presence.connect(userId)) {
       announcePresence(userId);

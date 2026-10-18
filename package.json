@@ -1,6 +1,6 @@
 {
   "name": "h-chat-backend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "H_CHAT API and real-time server",
   "type": "module",

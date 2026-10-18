@@ -1,0 +1,69 @@
+Claude Code session: H_CHAT (private end-to-end encrypted chat) — backend, chat app (web + Android), backoffice
+==============================================================================================================
+
+Session ID : cff78de1-92f1-4709-9115-3986f2d0012c
+Saved      : 2026-10-18 (last update: release v1.0.0, all repos merged to main and pushed)
+Transcript : /root/.claude/projects/-projects/cff78de1-92f1-4709-9115-3986f2d0012c.jsonl
+
+HOW TO RELAUNCH THIS CHAT
+-------------------------
+The session was started from /projects (not from one of the repos), so resume it from there:
+  cd /projects
+  claude --resume cff78de1-92f1-4709-9115-3986f2d0012c
+
+(Or run `claude --resume` in /projects and pick this session from the list.)
+A fresh session also works: read /projects/H_CHAT_NEXT_STEPS.txt and chat_backend/docs/MILESTONES.txt first.
+
+WHERE IT RUNS
+-------------
+  Chat app (web)   https://chat.omranisystems.com        gate code 666666
+  Android APK      https://chat.omranisystems.com/download/  (latest.json + h_chat-<version>.apk)
+  Backoffice       https://adminchat.omranisystems.com   gate code 123654, admin username "admin"
+  Call relay       turn.omranisystems.com (coturn on this server, ports 3478/5349, relay 49160-49200)
+  Secrets          /root/ACCESS.txt (never printed); Firebase key /root/.hchat/firebase-service-account.json
+
+REPOS (GitHub, SSH, branch main, everything pushed, tag v1.0.0)
+--------------------------------------------------------------
+  /projects/chat_backend     github.com/HamzaOMRANII/chat_backend     Node, TypeScript, Express 5, Socket.IO, MongoDB
+  /projects/chat_app         github.com/HamzaOMRANII/chat_app         React 19, Vite, Tailwind 4, Capacitor (Android)
+  /projects/chat_backoffice  github.com/HamzaOMRANII/chat_backoffice  React admin
+
+WHAT IS DONE (all approved, v1.0.0 released 2026-10-18)
+-------------------------------------------------------
+  M0  foundations, gates, deploy
+  M1  accounts: sign-up with admin approval, password + email code, recovery passcode, one session per account
+  M2  contacts: personal ID, invite codes, categories with rules, block/remove
+  M3  stored chats (Keep-alive 30 min..7 days / Automatic 7 days), E2E encryption (libsodium), safety codes,
+      read receipts, notifications (Web Push + in-app)
+  M4  live chats (letter by letter, nothing stored, 1 min drop wipe)
+  M5  encrypted files (100 MB/file, 2 GB/user, disk guard 80%), media screens, view-only (no screenshots on
+      Android), admin storage (ask to download, delete)
+  M6  export with the other side's approval (zip built on the device, 24 h window), all categories
+  M7  voice + video calls (WebRTC, TURN relay, signed offers), "receive calls" setting, device choice,
+      Firebase notifications + ringing when the Android app is closed, call service (screen off), earpiece/
+      headset/speaker order, update-available prompt
+  M8  groups (max 10, admin-made or user-requested with approval, per-member encryption, removed members can't
+      read new messages), group calls (max 6, only the starter ends for everyone)
+  M9  security review (chat_backend/docs/SECURITY_REVIEW.md), per-session rate limits, socket flood guard,
+      minimum app version ("Update required"), settings backup/restore, activity log filters -> v1.0.0
+
+HOW TO RELEASE / DEPLOY
+-----------------------
+  Backend     cd /projects/chat_backend && npm run build && pm2 restart h-chat
+  Chat app    cd /projects/chat_app && npm run release            (tests, version bump, web build, signed APK, publish)
+              npm run release -- minor | major                     (new milestone / major version)
+  Backoffice  cd /projects/chat_backoffice && npm run build        (nginx serves dist)
+  Rule: every chat_app change ends with `npm run release` (web + APK). Phones get the "Update available" card.
+
+TESTS
+-----
+  Backend     npx vitest run          (102 tests)
+  App         npx vitest run          (31 tests)
+  Backoffice  npx vitest run          (9 tests)
+  Browser     npx tsx tests/e2e/server.ts 4790 in chat_backend (test DB, fake mail, /__seed, /__group…),
+              Playwright scripts in the session scratchpad; stop with kill $(lsof -t -i:4790)
+
+OPEN IDEAS (not started)
+------------------------
+  - Full-screen ring over the lock screen for incoming calls (Android ConnectionService / full-screen intent)
+  - Viewing view-only PDFs inside the app (document reader)
