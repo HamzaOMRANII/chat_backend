@@ -158,6 +158,11 @@ export function createGroupsRouter(config: Config) {
       if (!group.keys.some((k) => String(k.userId) === w.userId && k.version === w.keyVersion)) throw conflict("The group keys changed. Reload it.", "stale_keys");
     }
     if (!body.wraps.some((w) => w.userId === user.id)) throw badRequest("Lock it for yourself too.");
+    // …and for every member who has a key, with their latest one: nobody is silently left out
+    for (const m of group.members) {
+      const latest = Math.max(0, ...group.keys.filter((k) => String(k.userId) === String(m)).map((k) => k.version));
+      if (latest && !body.wraps.some((w) => w.userId === String(m) && w.keyVersion === latest)) throw conflict("The group keys changed. Reload it.", "stale_keys");
+    }
     const file = body.fileId ? await StoredFile.findOne({ _id: body.fileId, groupId: group._id, senderId: user._id, status: "uploading" }) : null;
     if (body.fileId && (!file || file.got.length !== file.chunks)) throw conflict("The file isn't fully uploaded.", "file_incomplete");
     const sentAt = new Date();
