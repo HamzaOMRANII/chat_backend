@@ -138,7 +138,7 @@ M9  FINISH -> RELEASE 1.0
     Chat app  : polish, "update available" prompt, minimum version
     Backoffice: activity log
     DONE WHEN : release v1.0.0 deployed, h_chat.apk 1.0.0 published
-    Status    : [ ] not started
+    Status    : [x] APPROVED 2026-10-18 — RELEASED v1.0.0 (APK 1.0.0)
 
 
 5. WHAT YOU NEED TO DO DURING THE PROJECT
