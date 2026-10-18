@@ -121,4 +121,36 @@ describe("calls", () => {
     expect(turn.credential).toBe(createHmac("sha1", config.TURN_SECRET).update(turn.username).digest("base64"));
     expect(turn.urls.some((u: string) => u.startsWith("turn:"))).toBe(true);
   });
+
+  it("in a group: everyone is rung, newcomers learn who is in, only the starter ends it for everyone", async () => {
+    const a = await person("hamza", ["Friends"]);
+    const b = await person("leila.b", ["Friends"]);
+    const c = await person("rami.t", ["Friends"]);
+    const { Group } = await import("../src/models/group.js");
+    const { Category } = await import("../src/models/category.js");
+    const cat = (await Category.findOne({ name: "Friends" }))!;
+    const group = await Group.create({ name: "Site team", status: "active", categoryId: cat._id, mode: "keep", retentionMinutes: 1440, members: [a.id, b.id, c.id] });
+    const [sa, sb, sc] = await Promise.all([socketOf(a.token), socketOf(b.token), socketOf(c.token)]);
+    const ringB = next<{ callId: string; group: { name: string } }>(sb, "call:incoming");
+    const ringC = next(sc, "call:incoming");
+    const started = await ask<{ callId: string }>(sa, "call:start", { groupId: group.id, kind: "voice" });
+    expect((await ringB).group.name).toBe("Site team");
+    await ringC;
+
+    const aSeesB = next<{ user: { username: string } }>(sa, "call:joined");
+    expect(await ask(sb, "call:join", { callId: started.callId })).toMatchObject({ ok: true, joined: [{ username: "hamza" }] });
+    expect((await aSeesB).user.username).toBe("leila.b");
+    const joinedC = await ask<{ joined: { username: string }[] }>(sc, "call:join", { callId: started.callId });
+    expect(joinedC.joined.map((j) => j.username).sort()).toEqual(["hamza", "leila.b"]);
+
+    // leila.b can't end it for everyone: she just leaves
+    const cSeesLeft = next<{ userId: string }>(sc, "call:left");
+    sb.emit("call:leave", { callId: started.callId, everyone: true });
+    expect((await cSeesLeft).userId).toBe(b.id);
+    // hamza, who started it, ends it for everyone
+    const ended = next<{ reason: string }>(sc, "call:ended");
+    sa.emit("call:leave", { callId: started.callId, everyone: true });
+    expect(await ended).toMatchObject({ reason: "ended_by_starter" });
+    [sa, sb, sc].forEach((s) => s.close());
+  });
 });

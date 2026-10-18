@@ -30,6 +30,12 @@ outer.use((_req, res, next) => {
 });
 outer.get("/__codes", (_req, res) => res.json(mail.sent));
 // Exactly what the database holds for messages, to check that no plaintext reaches the server
+outer.get("/__groupmsgs", async (_req, res) => {
+  const list = await mongoose.connection.db!.collection("groupmessages").find({ senderId: { $exists: true } }).sort({ sentAt: 1 }).toArray();
+  const users = await mongoose.connection.db!.collection("users").find().toArray();
+  const name = (id: unknown) => users.find((u) => String(u._id) === String(id))?.username;
+  res.json(list.map((m) => ({ lockedFor: (m.wraps ?? []).map((w: { userId: unknown }) => name(w.userId)) })));
+});
 outer.get("/__files", async (_req, res) => res.json(await mongoose.connection.db!.collection("files").find({ status: "ready" }).toArray()));
 // Every piece on disk, and whether it contains a PNG header in clear (it never should)
 outer.get("/__media", async (_req, res) => {
@@ -47,7 +53,29 @@ outer.get("/__messages", async (_req, res) => res.json(await mongoose.connection
 outer.post("/__seed", async (_req, res) => {
   await approvedUser("hamza");
   await approvedUser("leila.b");
+  await approvedUser("rami.t");
   res.json({ ok: true });
+});
+// A group made "by the administrator": { name, members: [usernames] }; { id, members } to change its members
+outer.post("/__group", express.json(), async (req, res) => {
+  const { Group } = await import("../../src/models/group.js");
+  const { Category } = await import("../../src/models/category.js");
+  const { User } = await import("../../src/models/user.js");
+  const { dropMember, systemLine } = await import("../../src/modules/groups/service.js");
+  const users = await User.find({ username: { $in: req.body.members } });
+  if (req.body.id) {
+    const group = (await Group.findById(req.body.id))!;
+    for (const m of group.members.filter((m) => !users.some((u) => String(u._id) === String(m)))) {
+      const gone = await User.findById(m);
+      await dropMember(group, m);
+      await systemLine(group, "removed", gone!);
+    }
+    return res.json({ id: group.id });
+  }
+  const category = (await Category.findOne({ name: "Friends" }))!;
+  const group = await Group.create({ name: req.body.name, status: "active", categoryId: category._id, mode: "keep", retentionMinutes: 1440, members: users.map((u) => u._id) });
+  await systemLine(group, "created");
+  res.json({ id: group.id });
 });
 outer.use(express.static(join(import.meta.dirname, "../../../chat_app/dist")));
 // E2E_TURN_SECRET: the real relay's secret, to test calls through turn.omranisystems.com

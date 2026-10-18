@@ -8,6 +8,8 @@ import { auth, requireUser } from "../../middleware/auth.js";
 import { Chat } from "../../models/chat.js";
 import { FILE_KINDS, StoredFile } from "../../models/file.js";
 import { pairOptions } from "../chats/service.js";
+import { Group } from "../../models/group.js";
+import { Category } from "../../models/category.js";
 import {
   CHUNK_OVERHEAD,
   CHUNK_PLAIN,
@@ -31,7 +33,7 @@ export function createFilesRouter(config: Config) {
   const router = Router();
   router.use(["/files", "/media"], requireUser(config));
   // /chats/… is already guarded by the chats router, but this router can be reached first
-  router.use("/chats/:id/files", requireUser(config));
+  router.use(["/chats/:id/files", "/groups/:id/files"], requireUser(config));
   const me = (req: Request) => auth(req).user;
 
   async function activeChat(req: Request) {
@@ -44,7 +46,8 @@ export function createFilesRouter(config: Config) {
   async function myFile(req: Request) {
     const file = await StoredFile.findById(parse(objectIdSchema, req.params.id));
     const userId = me(req).id;
-    if (!file || (String(file.senderId) !== userId && String(file.recipientId) !== userId)) throw notFound("File not found");
+    const member = file?.groupId ? await Group.exists({ _id: file.groupId, members: me(req)._id }) : false;
+    if (!file || (String(file.senderId) !== userId && String(file.recipientId) !== userId && !member)) throw notFound("File not found");
     return file;
   }
 
@@ -80,10 +83,35 @@ export function createFilesRouter(config: Config) {
   router.get("/files/:id/chunks/:n", async (req, res) => {
     const file = await myFile(req);
     if (file.status !== "ready") throw notFound(file.status === "deleted" ? "This file was deleted." : "File not found");
-    if (!(await Chat.exists({ _id: file.chatId, status: "active" }))) throw notFound("This chat has ended.");
+    if (file.chatId && !(await Chat.exists({ _id: file.chatId, status: "active" }))) throw notFound("This chat has ended.");
     const n = parse(z.coerce.number().int().min(0), req.params.n);
     if (n >= file.chunks) throw notFound("No such piece");
     res.set({ "Content-Type": "application/octet-stream", "Cache-Control": "no-store" }).send(await readChunk(file.id, n));
+  });
+
+  // Start an upload in a group: the group's category must allow files
+  router.post("/groups/:id/files", async (req, res) => {
+    const body = parse(z.object({ kind: z.enum(FILE_KINDS), size: z.number().int().min(1).max(MAX_FILE_BYTES, "Files can be up to 100 MB.") }), req.body);
+    const user = me(req);
+    const group = await Group.findOne({ _id: new Types.ObjectId(parse(objectIdSchema, req.params.id)), members: user._id });
+    if (!group) throw notFound("You're not in this group.");
+    const category = await Category.findById(group.categoryId).lean();
+    if (category?.rules?.files !== "all") throw forbidden("Files aren't allowed in this group.", "files_not_allowed");
+    const chunks = Math.ceil(body.size / CHUNK_PLAIN);
+    const stored = body.size + chunks * CHUNK_OVERHEAD;
+    if ((await usedBy(user._id)).bytes + stored > QUOTA_BYTES) throw conflict("Your 2 GB of files is full. Delete some media or wait until it expires.", "quota_full");
+    if ((await disk()).ratio >= DISK_LIMIT) throw conflict("The server is full right now. Try again later.", "disk_full");
+    const file = await StoredFile.create({ groupId: group._id, senderId: user._id, kind: body.kind, size: stored, chunks, status: "uploading", expiresAt: uploadDeadline() });
+    res.status(201).json({ file: { id: file.id, chunks, chunkSize: CHUNK_PLAIN } });
+  });
+
+  router.get("/groups/:id/files", async (req, res) => {
+    const group = await Group.findOne({ _id: new Types.ObjectId(parse(objectIdSchema, req.params.id)), members: me(req)._id });
+    if (!group) throw notFound("You're not in this group.");
+    const files = await StoredFile.find({ groupId: group._id, status: { $ne: "uploading" } }).sort({ createdAt: -1 }).lean();
+    res.json({
+      files: files.map((f) => ({ id: String(f._id), senderId: String(f.senderId), kind: f.kind, size: f.size, status: f.status, deletedReason: f.deletedReason ?? null, messageId: f.messageId ? String(f.messageId) : null, expiresAt: f.expiresAt })),
+    });
   });
 
   // The files of a chat (deleted ones too, a day long: the chat shows "removed")
@@ -108,6 +136,7 @@ export function createFilesRouter(config: Config) {
   router.post("/files/delete", async (req, res) => {
     const { ids } = parse(z.object({ ids: z.array(objectIdSchema).min(1).max(500) }), req.body);
     const userId = me(req)._id;
+    // Stored chats: either side. Groups: the one who sent it.
     const files = await StoredFile.find({ _id: { $in: ids }, $or: [{ senderId: userId }, { recipientId: userId }], status: { $ne: "deleted" } });
     await deleteFiles(files, "deleted_by_user", me(req).id);
     res.json({ deleted: files.length });
