@@ -7,7 +7,10 @@ import { auth, requireUser } from "../../middleware/auth.js";
 import { PushSubscription } from "../../models/pushSubscription.js";
 import { FcmToken } from "../../models/fcmToken.js";
 
-const b64url = z.string().regex(/^[A-Za-z0-9_-]+={0,2}$/).max(200);
+const b64url = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]+={0,2}$/)
+  .max(200);
 const subscription = z.object({ endpoint: z.url().startsWith("https://").max(1000), keys: z.object({ p256dh: b64url, auth: b64url }) });
 const prefs = z.object({ messages: z.boolean(), chats: z.boolean(), contacts: z.boolean() }).partial();
 

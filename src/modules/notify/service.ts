@@ -8,7 +8,19 @@ import { User } from "../../models/user.js";
 import { presence } from "../../realtime/presence.js";
 import { sendFcm } from "./fcm.js";
 
-export type NotifyKind = "contact_request" | "contact_added" | "chat_invite" | "chat_accepted" | "chat_declined" | "chat_ended" | "live_invite" | "media_request" | "export_request" | "export_answer" | "call" | "message";
+export type NotifyKind =
+  | "contact_request"
+  | "contact_added"
+  | "chat_invite"
+  | "chat_accepted"
+  | "chat_declined"
+  | "chat_ended"
+  | "live_invite"
+  | "media_request"
+  | "export_request"
+  | "export_answer"
+  | "call"
+  | "message";
 /** Which setting turns each kind's system notification on or off. */
 const PREF: Record<NotifyKind, "messages" | "chats" | "contacts"> = {
   contact_request: "contacts",
@@ -56,17 +68,21 @@ export async function notify(userId: Types.ObjectId | string, n: Omit<Notificati
     bus.toUsers([userId], "notify", { ...n, system });
     if (!system || !user.activeSessionId || presence.onScreen(user.activeSessionId)) return;
     // Android app closed or in the background: Firebase (generic text only)
-    void sendFcm(String(user.activeSessionId), { kind: n.kind, tag: n.tag, url: openUrl(n.open), body: n.body }).catch((err) => logger.warn({ err }, "firebase failed"));
+    void sendFcm(String(user.activeSessionId), { kind: n.kind, tag: n.tag, url: openUrl(n.open), body: n.body }).catch((err) =>
+      logger.warn({ err }, "firebase failed"),
+    );
     if (!pushReady) return;
     const subs = await PushSubscription.find({ userId, sessionId: user.activeSessionId }).lean();
     const payload = JSON.stringify({ title: n.title, body: n.body, tag: n.tag, url: openUrl(n.open) });
     await Promise.all(
       subs.map((s) =>
-        webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600, urgency: "high" }).catch(async (err: { statusCode?: number }) => {
-          // The browser dropped the subscription
-          if (err.statusCode === 404 || err.statusCode === 410) await PushSubscription.deleteOne({ _id: s._id });
-          else logger.warn({ status: err.statusCode }, "web push failed");
-        }),
+        webpush
+          .sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600, urgency: "high" })
+          .catch(async (err: { statusCode?: number }) => {
+            // The browser dropped the subscription
+            if (err.statusCode === 404 || err.statusCode === 410) await PushSubscription.deleteOne({ _id: s._id });
+            else logger.warn({ status: err.statusCode }, "web push failed");
+          }),
       ),
     );
   } catch (err) {
@@ -75,7 +91,18 @@ export async function notify(userId: Types.ObjectId | string, n: Omit<Notificati
 }
 
 /** Where a tap on a browser notification opens the app. */
-export const openUrl = (open: Notification["open"]) => (open.chatId ? `/#chat=${open.chatId}` : open.liveId ? `/#live=${open.liveId}` : open.media ? "/#media=all" : open.groupId ? `/#group=${open.groupId}` : open.userId ? `/#contact=${open.userId}` : "/");
+export const openUrl = (open: Notification["open"]) =>
+  open.chatId
+    ? `/#chat=${open.chatId}`
+    : open.liveId
+      ? `/#live=${open.liveId}`
+      : open.media
+        ? "/#media=all"
+        : open.groupId
+          ? `/#group=${open.groupId}`
+          : open.userId
+            ? `/#contact=${open.userId}`
+            : "/";
 
 /** "30 min", "6 hours", "2 days" */
 export const retentionText = (minutes: number) =>

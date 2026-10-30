@@ -12,10 +12,16 @@ export function registerCategories(router: Router, { admin, log }: AdminContext)
   router.get("/categories", admin, async (_req, res) => {
     const [categories, members] = await Promise.all([
       Category.find().sort({ order: 1 }).lean(),
-      User.aggregate([{ $match: { role: "user", status: { $in: ["approved", "suspended"] } } }, { $unwind: "$categoryIds" }, { $group: { _id: "$categoryIds", n: { $sum: 1 } } }]),
+      User.aggregate([
+        { $match: { role: "user", status: { $in: ["approved", "suspended"] } } },
+        { $unwind: "$categoryIds" },
+        { $group: { _id: "$categoryIds", n: { $sum: 1 } } },
+      ]),
     ]);
     const count = new Map(members.map((m) => [String(m._id), m.n]));
-    res.json({ categories: categories.map((c) => ({ id: String(c._id), name: c.name, order: c.order, rules: c.rules, members: count.get(String(c._id)) ?? 0 })) });
+    res.json({
+      categories: categories.map((c) => ({ id: String(c._id), name: c.name, order: c.order, rules: c.rules, members: count.get(String(c._id)) ?? 0 })),
+    });
   });
 
   router.get("/categories/:id/members", admin, async (req, res) => {

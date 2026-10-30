@@ -10,7 +10,7 @@ import { User } from "../../models/user.js";
 import { endLive } from "../live/service.js";
 import { StoredFile } from "../../models/file.js";
 import { ExportRequest } from "../../models/exportRequest.js";
-import { deleteFiles, } from "../files/service.js";
+import { deleteFiles } from "../files/service.js";
 import { LiveSession } from "../../models/liveSession.js";
 import { endChat } from "../chats/service.js";
 import type { AdminContext } from "./context.js";
@@ -18,7 +18,9 @@ import type { AdminContext } from "./context.js";
 /** Chats: metadata only, content is end-to-end encrypted. */
 export function registerChats(router: Router, { admin, log }: AdminContext) {
   async function chatRows(chats: ChatFields[]) {
-    const users = await User.find({ _id: { $in: chats.flatMap((c) => c.participants) } }).select("username").lean();
+    const users = await User.find({ _id: { $in: chats.flatMap((c) => c.participants) } })
+      .select("username")
+      .lean();
     const names = new Map(users.map((u) => [String(u._id), u.username]));
     const categories = await Category.find().select("name").lean();
     const catNames = new Map(categories.map((c) => [String(c._id), c.name]));
@@ -37,13 +39,13 @@ export function registerChats(router: Router, { admin, log }: AdminContext) {
         mode: c.mode,
         retentionMinutes: c.retentionMinutes,
         status: c.status,
-        category: c.categoryId ? catNames.get(String(c.categoryId)) ?? null : null,
+        category: c.categoryId ? (catNames.get(String(c.categoryId)) ?? null) : null,
         startedBy: names.get(String(c.createdBy)) ?? null,
         invitedAt: c.invitedAt,
         acceptedAt: c.acceptedAt ?? null,
         endedAt: c.endedAt ?? null,
         endReason: c.endReason ?? null,
-        endedBy: c.endedBy ? names.get(String(c.endedBy)) ?? "admin" : null,
+        endedBy: c.endedBy ? (names.get(String(c.endedBy)) ?? "admin") : null,
         lastMessageAt: c.lastMessageAt ?? null,
         messagesSent: c.messageCount ?? 0,
         stored: { count: st?.n ?? 0, bytes: st?.bytes ?? 0, nextExpiry: st?.oldest ?? null },
@@ -81,7 +83,11 @@ export function registerChats(router: Router, { admin, log }: AdminContext) {
     const chat = await Chat.findById(parse(objectIdSchema, req.params.id)).lean<ChatFields>();
     if (!chat) throw notFound("Chat not found");
     const [row] = await chatRows([chat]);
-    const messages = await Message.find({ chatId: chat._id }).sort({ sentAt: -1 }).limit(30).select("senderId recipientId size sentAt deliveredAt readAt expiresAt").lean();
+    const messages = await Message.find({ chatId: chat._id })
+      .sort({ sentAt: -1 })
+      .limit(30)
+      .select("senderId recipientId size sentAt deliveredAt readAt expiresAt")
+      .lean();
     const names = new Map(row!.people.map((p) => [p.id, p.username]));
     const exports = await ExportRequest.find({ chatId: chat._id }).sort({ requestedAt: -1 }).limit(20).lean();
     res.json({
@@ -137,7 +143,11 @@ export function registerChats(router: Router, { admin, log }: AdminContext) {
       const files = await StoredFile.find({ chatId: chat._id });
       bytes += files.filter((f) => f.status !== "deleted").reduce((a, f) => a + f.size, 0);
       await deleteFiles(files, "removed_by_admin");
-      await Promise.all([Message.deleteMany({ chatId: chat._id }), StoredFile.deleteMany({ chatId: chat._id }), ExportRequest.deleteMany({ chatId: chat._id })]);
+      await Promise.all([
+        Message.deleteMany({ chatId: chat._id }),
+        StoredFile.deleteMany({ chatId: chat._id }),
+        ExportRequest.deleteMany({ chatId: chat._id }),
+      ]);
       await Chat.deleteOne({ _id: chat._id });
     }
     for (const live of lives) {

@@ -51,7 +51,10 @@ export const Group = model("Group", groupSchema);
  * A group message: the text (and any file's key) encrypted once with a random message key; that key is locked
  * ("wrapped") for each member's group key. System lines ("added rami.t") carry no secret and no ciphertext.
  */
-const wrapSchema = new Schema({ userId: { type: Schema.Types.ObjectId, required: true }, keyVersion: { type: Number, required: true }, key: { type: String, required: true } }, { _id: false });
+const wrapSchema = new Schema(
+  { userId: { type: Schema.Types.ObjectId, required: true }, keyVersion: { type: Number, required: true }, key: { type: String, required: true } },
+  { _id: false },
+);
 const groupMessageSchema = new Schema({
   groupId: { type: Schema.Types.ObjectId, ref: "Group", required: true },
   senderId: { type: Schema.Types.ObjectId, ref: "User" },

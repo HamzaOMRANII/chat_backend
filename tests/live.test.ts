@@ -36,9 +36,13 @@ const key = () => ({ pub: b64(32), sig: b64(64) });
 async function person(username: string) {
   const dev = device({ platform: "android" });
   const step1 = await request(url).post("/api/auth/login").set("X-Client", "android").send({ username, password: PASSWORD, device: dev });
-  const step2 = await request(url).post("/api/auth/verify-code").set("X-Client", "android").send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
+  const step2 = await request(url)
+    .post("/api/auth/verify-code")
+    .set("X-Client", "android")
+    .send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
   const token = step2.body.token as string;
-  const api = (method: "get" | "post" | "put" | "delete", path: string, body?: object) => request(url)[method](path).set("Authorization", `Bearer ${token}`).set("X-Client", "android").send(body);
+  const api = (method: "get" | "post" | "put" | "delete", path: string, body?: object) =>
+    request(url)[method](path).set("Authorization", `Bearer ${token}`).set("X-Client", "android").send(body);
   await api("put", "/api/keys/identity", { deviceId: dev.deviceId, signPub: b64(32) }).expect(200);
   return { token, api };
 }

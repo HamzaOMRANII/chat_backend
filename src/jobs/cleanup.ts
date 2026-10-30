@@ -20,7 +20,8 @@ export async function cleanupOnce() {
 
 export function startCleanupJob() {
   const run = () => void cleanupOnce().catch((err) => logger.error({ err }, "cleanup failed"));
-  const chats = () => void Promise.all([expireChats(), expireLive(), cleanupFiles(), expireExports()]).catch((err) => logger.error({ err }, "chat expiry failed"));
+  const chats = () =>
+    void Promise.all([expireChats(), expireLive(), cleanupFiles(), expireExports()]).catch((err) => logger.error({ err }, "chat expiry failed"));
   run();
   const hourly = setInterval(run, 60 * 60_000);
   const minutely = setInterval(chats, 60_000);

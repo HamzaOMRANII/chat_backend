@@ -19,9 +19,15 @@ import { Friendship, pair } from "../../models/friendship.js";
 const key32 = z.string().regex(/^[A-Za-z0-9+/]{43}=$/, "invalid key");
 const sig64 = z.string().regex(/^[A-Za-z0-9+/]{86}==$/, "invalid signature");
 const nonce24 = z.string().regex(/^[A-Za-z0-9+/]{32}$/, "invalid nonce");
-const ciphertext = z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/, "invalid ciphertext").max(24_000, "message too long");
+const ciphertext = z
+  .string()
+  .regex(/^[A-Za-z0-9+/]+={0,2}$/, "invalid ciphertext")
+  .max(24_000, "message too long");
 // A message key (32 bytes) locked for one member: nonce (24) + box (48), base64
-const wrapped = z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/).max(200);
+const wrapped = z
+  .string()
+  .regex(/^[A-Za-z0-9+/]+={0,2}$/)
+  .max(200);
 
 /** Mounted on /api: /api/groups/… for members. Groups themselves are made by the administrator. */
 export function createGroupsRouter(config: Config) {
@@ -36,11 +42,15 @@ export function createGroupsRouter(config: Config) {
   }
 
   async function groupsJson(user: UserDoc, groups: GroupDoc[]) {
-    const people = await User.find({ _id: { $in: groups.flatMap((g) => g.members) } }).select("username identity lastSeenAt").lean();
+    const people = await User.find({ _id: { $in: groups.flatMap((g) => g.members) } })
+      .select("username identity lastSeenAt")
+      .lean();
     const byId = new Map(people.map((p) => [String(p._id), p]));
     const categories = await Category.find({ _id: { $in: groups.map((g) => g.categoryId) } }).lean();
     const unread = await GroupMessage.aggregate<{ _id: Types.ObjectId; n: number }>([
-      { $match: { groupId: { $in: groups.map((g) => g._id) }, senderId: { $ne: user._id, $exists: true }, readBy: { $ne: user._id }, "wraps.userId": user._id } },
+      {
+        $match: { groupId: { $in: groups.map((g) => g._id) }, senderId: { $ne: user._id, $exists: true }, readBy: { $ne: user._id }, "wraps.userId": user._id },
+      },
       { $group: { _id: "$groupId", n: { $sum: 1 } } },
     ]);
     return groups.map((g) => {
@@ -53,7 +63,13 @@ export function createGroupsRouter(config: Config) {
         files: (rules?.files ?? "none") === "all",
         members: g.members.map((m) => {
           const p = byId.get(String(m));
-          return { id: String(m), username: p?.username ?? "?", online: presence.isOnline(m), lastSeenAt: p?.lastSeenAt ?? null, identityPub: p?.identity?.signPub ?? null };
+          return {
+            id: String(m),
+            username: p?.username ?? "?",
+            online: presence.isOnline(m),
+            lastSeenAt: p?.lastSeenAt ?? null,
+            identityPub: p?.identity?.signPub ?? null,
+          };
         }),
         keys: g.keys.map((k) => ({ userId: String(k.userId), version: k.version, pub: k.pub, sig: k.sig, identityPub: k.identityPub })),
         lastMessageAt: g.lastMessageAt ?? null,
@@ -66,24 +82,54 @@ export function createGroupsRouter(config: Config) {
   router.get("/groups", async (req, res) => {
     const groups = await Group.find({ members: me(req)._id, status: "active" }).sort({ lastMessageAt: -1, createdAt: -1 });
     // My own requests waiting for the administrator (or refused)
-    const requests = await Group.find({ requestedBy: me(req)._id, status: { $in: ["pending", "refused"] } }).sort({ createdAt: -1 }).lean();
-    const names = new Map((await User.find({ _id: { $in: requests.flatMap((r) => r.members) } }).select("username").lean()).map((u) => [String(u._id), u.username]));
+    const requests = await Group.find({ requestedBy: me(req)._id, status: { $in: ["pending", "refused"] } })
+      .sort({ createdAt: -1 })
+      .lean();
+    const names = new Map(
+      (
+        await User.find({ _id: { $in: requests.flatMap((r) => r.members) } })
+          .select("username")
+          .lean()
+      ).map((u) => [String(u._id), u.username]),
+    );
     res.json({
       groups: await groupsJson(me(req), groups),
-      requests: requests.map((r) => ({ id: String(r._id), name: r.name, status: r.status, members: r.members.map((m) => names.get(String(m)) ?? "?"), at: r.createdAt })),
+      requests: requests.map((r) => ({
+        id: String(r._id),
+        name: r.name,
+        status: r.status,
+        members: r.members.map((m) => names.get(String(m)) ?? "?"),
+        at: r.createdAt,
+      })),
     });
   });
 
   // Ask the administrator for a group with some of my contacts (up to 10 people, me included)
   router.post("/groups/requests", async (req, res) => {
-    const body = parse(z.object({ name: z.string().trim().min(2).max(60), memberIds: z.array(objectIdSchema).min(1).max(GROUP_MAX_MEMBERS - 1) }), req.body);
+    const body = parse(
+      z.object({
+        name: z.string().trim().min(2).max(60),
+        memberIds: z
+          .array(objectIdSchema)
+          .min(1)
+          .max(GROUP_MAX_MEMBERS - 1),
+      }),
+      req.body,
+    );
     const user = me(req);
     const ids = [...new Set(body.memberIds)].filter((id) => id !== user.id);
     for (const id of ids) {
-      if (!(await Friendship.exists({ pairKey: pair(user._id, id).pairKey, status: "accepted" }))) throw badRequest("You can only add your contacts.", "not_contact");
+      if (!(await Friendship.exists({ pairKey: pair(user._id, id).pairKey, status: "accepted" })))
+        throw badRequest("You can only add your contacts.", "not_contact");
     }
-    if ((await Group.countDocuments({ requestedBy: user._id, status: "pending" })) >= 3) throw conflict("You already have 3 requests waiting. Wait for the administrator's answer.", "too_many_requests");
-    const group = await Group.create({ name: body.name, status: "pending", requestedBy: user._id, members: [user._id, ...ids.map((id) => new Types.ObjectId(id))] });
+    if ((await Group.countDocuments({ requestedBy: user._id, status: "pending" })) >= 3)
+      throw conflict("You already have 3 requests waiting. Wait for the administrator's answer.", "too_many_requests");
+    const group = await Group.create({
+      name: body.name,
+      status: "pending",
+      requestedBy: user._id,
+      members: [user._id, ...ids.map((id) => new Types.ObjectId(id))],
+    });
     res.status(201).json({ request: { id: group.id, name: group.name, status: group.status } });
   });
 
@@ -146,7 +192,10 @@ export function createGroupsRouter(config: Config) {
         ciphertext,
         nonce: nonce24,
         senderKeyVersion: z.number().int().min(1),
-        wraps: z.array(z.object({ userId: objectIdSchema, keyVersion: z.number().int().min(1), key: wrapped })).min(1).max(20),
+        wraps: z
+          .array(z.object({ userId: objectIdSchema, keyVersion: z.number().int().min(1), key: wrapped }))
+          .min(1)
+          .max(20),
         fileId: objectIdSchema.optional(),
       }),
       req.body,
@@ -157,13 +206,15 @@ export function createGroupsRouter(config: Config) {
     // Locked only for current members, each with a key they really published
     for (const w of body.wraps) {
       if (!members.has(w.userId)) throw conflict("The group changed. Reload it.", "stale_members");
-      if (!group.keys.some((k) => String(k.userId) === w.userId && k.version === w.keyVersion)) throw conflict("The group keys changed. Reload it.", "stale_keys");
+      if (!group.keys.some((k) => String(k.userId) === w.userId && k.version === w.keyVersion))
+        throw conflict("The group keys changed. Reload it.", "stale_keys");
     }
     if (!body.wraps.some((w) => w.userId === user.id)) throw badRequest("Lock it for yourself too.");
     // …and for every member who has a key, with their latest one: nobody is silently left out
     for (const m of group.members) {
       const latest = Math.max(0, ...group.keys.filter((k) => String(k.userId) === String(m)).map((k) => k.version));
-      if (latest && !body.wraps.some((w) => w.userId === String(m) && w.keyVersion === latest)) throw conflict("The group keys changed. Reload it.", "stale_keys");
+      if (latest && !body.wraps.some((w) => w.userId === String(m) && w.keyVersion === latest))
+        throw conflict("The group keys changed. Reload it.", "stale_keys");
     }
     const file = body.fileId ? await StoredFile.findOne({ _id: body.fileId, groupId: group._id, senderId: user._id, status: "uploading" }) : null;
     if (body.fileId && (!file || file.got.length !== file.chunks)) throw conflict("The file isn't fully uploaded.", "file_incomplete");
@@ -193,9 +244,28 @@ export function createGroupsRouter(config: Config) {
       const w = body.wraps.find((x) => x.userId === String(m));
       bus.toUsers([m], "group:msg", {
         groupId: group.id,
-        message: { id: message.id, senderId: user.id, system: null, ciphertext: w ? body.ciphertext : null, nonce: w ? body.nonce : null, senderKeyVersion: body.senderKeyVersion, wrap: w ? { keyVersion: w.keyVersion, key: w.key } : null, fileId: file ? file.id : null, readBy: 1, recipients: body.wraps.length - 1, sentAt, expiresAt: message.expiresAt },
+        message: {
+          id: message.id,
+          senderId: user.id,
+          system: null,
+          ciphertext: w ? body.ciphertext : null,
+          nonce: w ? body.nonce : null,
+          senderKeyVersion: body.senderKeyVersion,
+          wrap: w ? { keyVersion: w.keyVersion, key: w.key } : null,
+          fileId: file ? file.id : null,
+          readBy: 1,
+          recipients: body.wraps.length - 1,
+          sentAt,
+          expiresAt: message.expiresAt,
+        },
       });
-      void notify(m, { kind: "message", title: group.name, body: `${user.username}: ${file ? "sent a file" : "new message"}`, tag: `group:${group.id}`, open: { groupId: group.id } });
+      void notify(m, {
+        kind: "message",
+        title: group.name,
+        body: `${user.username}: ${file ? "sent a file" : "new message"}`,
+        tag: `group:${group.id}`,
+        open: { groupId: group.id },
+      });
     }
     res.status(201).json({ message: { id: message.id, sentAt, expiresAt: message.expiresAt, recipients: body.wraps.length - 1 } });
   });
@@ -204,7 +274,9 @@ export function createGroupsRouter(config: Config) {
   router.post("/groups/:id/read", async (req, res) => {
     const user = me(req);
     const group = await myGroup(req);
-    const unread = await GroupMessage.find({ groupId: group._id, readBy: { $ne: user._id }, "wraps.userId": user._id }).select("_id senderId").lean();
+    const unread = await GroupMessage.find({ groupId: group._id, readBy: { $ne: user._id }, "wraps.userId": user._id })
+      .select("_id senderId")
+      .lean();
     if (unread.length) {
       await GroupMessage.updateMany({ _id: { $in: unread.map((m) => m._id) } }, { $addToSet: { readBy: user._id } });
       bus.toUsers(group.members, "group:read", { groupId: group.id, by: user.id, ids: unread.map((m) => String(m._id)) });

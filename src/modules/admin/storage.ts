@@ -25,7 +25,14 @@ export function registerStorage(router: Router, { admin, log, findUser }: AdminC
     const d = await disk();
     const rows = users.map((u) => {
       const st = perUser.find((p) => String(p._id) === String(u._id));
-      return { id: String(u._id), username: u.username, files: st?.n ?? 0, bytes: st?.bytes ?? 0, nextExpiry: st?.next ?? null, request: u.mediaRequest?.deadline ?? null };
+      return {
+        id: String(u._id),
+        username: u.username,
+        files: st?.n ?? 0,
+        bytes: st?.bytes ?? 0,
+        nextExpiry: st?.next ?? null,
+        request: u.mediaRequest?.deadline ?? null,
+      };
     });
     res.json({
       files: rows.reduce((a, r) => a + r.files, 0),
@@ -40,13 +47,25 @@ export function registerStorage(router: Router, { admin, log, findUser }: AdminC
 
   router.get("/storage/users/:id", admin, async (req, res) => {
     const user = await findUser(req.params.id as string);
-    const files = await StoredFile.find({ senderId: user._id, status: { $in: ["uploading", "ready"] } }).sort({ size: -1 }).lean();
-    const others = await User.find({ _id: { $in: files.map((f) => f.recipientId) } }).select("username").lean();
+    const files = await StoredFile.find({ senderId: user._id, status: { $in: ["uploading", "ready"] } })
+      .sort({ size: -1 })
+      .lean();
+    const others = await User.find({ _id: { $in: files.map((f) => f.recipientId) } })
+      .select("username")
+      .lean();
     const names = new Map(others.map((o) => [String(o._id), o.username]));
     res.json({
       user: { id: user.id, username: user.username, request: user.mediaRequest?.deadline ?? null },
       quota: QUOTA_BYTES,
-      files: files.map((f) => ({ id: String(f._id), kind: f.kind, size: f.size, to: names.get(String(f.recipientId)) ?? "?", status: f.status, createdAt: (f as { createdAt?: Date }).createdAt ?? null, expiresAt: f.expiresAt })),
+      files: files.map((f) => ({
+        id: String(f._id),
+        kind: f.kind,
+        size: f.size,
+        to: names.get(String(f.recipientId)) ?? "?",
+        status: f.status,
+        createdAt: (f as { createdAt?: Date }).createdAt ?? null,
+        expiresAt: f.expiresAt,
+      })),
     });
   });
 
@@ -58,7 +77,13 @@ export function registerStorage(router: Router, { admin, log, findUser }: AdminC
     user.set("mediaRequest", { deadline, requestedAt: new Date(), reminded: [] });
     await user.save();
     const when = deadline.toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
-    void notify(user._id, { kind: "media_request", title: "Download your media", body: `The administrator is freeing space: your files will be deleted on ${when} (UTC).`, tag: "media-request", open: { media: true } });
+    void notify(user._id, {
+      kind: "media_request",
+      title: "Download your media",
+      body: `The administrator is freeing space: your files will be deleted on ${when} (UTC).`,
+      tag: "media-request",
+      open: { media: true },
+    });
     bus.toUsers([user._id], "media:request", { deadline });
     await log(req, "storage.request", user._id, { hours });
     res.json({ deadline });

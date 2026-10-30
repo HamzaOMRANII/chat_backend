@@ -13,7 +13,10 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "create-admin": "node dist/scripts/create-admin.js"
+    "create-admin": "node dist/scripts/create-admin.js",
+    "lint": "biome check",
+    "format": "biome format --write",
+    "check": "biome check && npm run typecheck && npm test"
   },
   "dependencies": {
     "argon2": "^0.45.1",

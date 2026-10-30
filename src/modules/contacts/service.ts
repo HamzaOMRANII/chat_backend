@@ -15,7 +15,10 @@ export const newInviteCode = () => `${randomChars(4)}-${randomChars(4)}`;
 
 /** Accepts "hc-4kx7 92qm", "4KX792QM", "HC-4KX7-92QM"…; returns the stored form or null. */
 export function normalizePersonalId(input: string) {
-  const raw = input.toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^HC/, "");
+  const raw = input
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .replace(/^HC/, "");
   return raw.length === 8 && [...raw].every((c) => ALPHABET.includes(c)) ? `HC-${raw.slice(0, 4)}-${raw.slice(4)}` : null;
 }
 export function normalizeInviteCode(input: string) {
@@ -44,12 +47,20 @@ export const sharedCategoryIds = (a: { categoryIds: Types.ObjectId[] }, b: { cat
 export async function effectiveCategoryId(shared: string[], override?: Types.ObjectId | null) {
   if (!shared.length) return null;
   if (override && shared.includes(String(override))) return String(override);
-  const first = await Category.findOne({ _id: { $in: shared } }).sort({ order: 1 }).select("_id").lean();
+  const first = await Category.findOne({ _id: { $in: shared } })
+    .sort({ order: 1 })
+    .select("_id")
+    .lean();
   return first ? String(first._id) : null;
 }
 
 export async function blockedEitherWay(a: Types.ObjectId | string, b: Types.ObjectId | string) {
-  return !!(await Block.exists({ $or: [{ blockerId: a, blockedId: b }, { blockerId: b, blockedId: a }] }));
+  return !!(await Block.exists({
+    $or: [
+      { blockerId: a, blockedId: b },
+      { blockerId: b, blockedId: a },
+    ],
+  }));
 }
 
 /** Can these two be (or stay) in touch: both approved, a shared category, no block. */
@@ -70,7 +81,9 @@ type Other = { _id: Types.ObjectId; username: string; status: string; categoryId
  * isn't approved, is "paused": hidden from both until the admin fixes it.
  */
 export async function contactsView(me: UserDoc) {
-  const friendships = await Friendship.find({ $or: [{ userA: me._id }, { userB: me._id }] }).sort({ updatedAt: -1 }).lean();
+  const friendships = await Friendship.find({ $or: [{ userA: me._id }, { userB: me._id }] })
+    .sort({ updatedAt: -1 })
+    .lean();
   const others = await User.find({ _id: { $in: friendships.map((f) => otherUserId(f, me._id)) } })
     .select("username status categoryIds lastSeenAt")
     .lean<Other[]>();
@@ -103,6 +116,8 @@ export function contactJson(other: Other, f: { acceptedAt?: Date | null; created
 
 /** Ids of everyone with a friendship (any state) with this user, for live updates. */
 export async function relatedUserIds(userId: Types.ObjectId | string) {
-  const fs = await Friendship.find({ $or: [{ userA: userId }, { userB: userId }] }).select("userA userB").lean();
+  const fs = await Friendship.find({ $or: [{ userA: userId }, { userB: userId }] })
+    .select("userA userB")
+    .lean();
   return fs.map((f) => String(otherUserId(f, userId)));
 }

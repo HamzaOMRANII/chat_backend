@@ -6,7 +6,18 @@ import { clientDeviceSchema, deviceSnapshot, type DeviceSnapshot } from "../../l
 import { badRequest, conflict, forbidden, HttpError, locked, unauthorized } from "../../lib/errors.js";
 import type { Mailer } from "../../lib/mailer.js";
 import { hashSecret, maskEmail, numericCode, sameHash, sha256, verifySecret } from "../../lib/secrets.js";
-import { codeSchema, emailSchema, loginFilter, loginIdSchema, objectIdSchema, parse, passcodeSchema, passwordSchema, secureCodeSchema, usernameSchema } from "../../lib/validate.js";
+import {
+  codeSchema,
+  emailSchema,
+  loginFilter,
+  loginIdSchema,
+  objectIdSchema,
+  parse,
+  passcodeSchema,
+  passwordSchema,
+  secureCodeSchema,
+  usernameSchema,
+} from "../../lib/validate.js";
 import { auth, requireUser } from "../../middleware/auth.js";
 import { Challenge } from "../../models/challenge.js";
 import { DeviceEvent } from "../../models/deviceEvent.js";
@@ -173,7 +184,9 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
       await registerFailure(user, d);
       await recordEvent(user._id, "failed_secure_code", d);
       const left = CODE_ATTEMPTS - challenge.attempts;
-      throw new HttpError(400, "wrong_secure_code", left > 0 ? "Wrong secure code." : "Too many wrong codes. Sign in again.", { attemptsLeft: Math.max(left, 0) });
+      throw new HttpError(400, "wrong_secure_code", left > 0 ? "Wrong secure code." : "Too many wrong codes. Sign in again.", {
+        attemptsLeft: Math.max(left, 0),
+      });
     }
     await challenge.deleteOne();
     await clearFailures(user);

@@ -61,9 +61,19 @@ export function createFilesRouter(config: Config) {
     if (options?.files !== "all") throw forbidden("Files aren't allowed with this contact.", "files_not_allowed");
     const chunks = Math.ceil(body.size / CHUNK_PLAIN);
     const stored = body.size + chunks * CHUNK_OVERHEAD;
-    if ((await usedBy(user._id)).bytes + stored > QUOTA_BYTES) throw conflict("Your 2 GB of files is full. Delete some media or wait until it expires.", "quota_full");
+    if ((await usedBy(user._id)).bytes + stored > QUOTA_BYTES)
+      throw conflict("Your 2 GB of files is full. Delete some media or wait until it expires.", "quota_full");
     if ((await disk()).ratio >= DISK_LIMIT) throw conflict("The server is full right now. Try again later.", "disk_full");
-    const file = await StoredFile.create({ chatId: chat._id, senderId: user._id, recipientId, kind: body.kind, size: stored, chunks, status: "uploading", expiresAt: uploadDeadline() });
+    const file = await StoredFile.create({
+      chatId: chat._id,
+      senderId: user._id,
+      recipientId,
+      kind: body.kind,
+      size: stored,
+      chunks,
+      status: "uploading",
+      expiresAt: uploadDeadline(),
+    });
     res.status(201).json({ file: { id: file.id, chunks, chunkSize: CHUNK_PLAIN } });
   });
 
@@ -71,12 +81,20 @@ export function createFilesRouter(config: Config) {
   router.put("/files/:id/chunks/:n", express.raw({ type: "application/octet-stream", limit: CHUNK_PLAIN + CHUNK_OVERHEAD + 1024 }), async (req, res) => {
     const file = await myFile(req);
     if (String(file.senderId) !== me(req).id || file.status !== "uploading") throw conflict("This upload is closed.");
-    const n = parse(z.coerce.number().int().min(0).max(MAX_CHUNKS - 1), req.params.n);
+    const n = parse(
+      z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(MAX_CHUNKS - 1),
+      req.params.n,
+    );
     if (n >= file.chunks) throw badRequest("No such piece");
     const data = req.body as Buffer;
-    if (!Buffer.isBuffer(data) || data.length !== pieceSize(file.size - file.chunks * CHUNK_OVERHEAD, file.chunks, n)) throw badRequest("Wrong piece size", "bad_piece");
+    if (!Buffer.isBuffer(data) || data.length !== pieceSize(file.size - file.chunks * CHUNK_OVERHEAD, file.chunks, n))
+      throw badRequest("Wrong piece size", "bad_piece");
     await saveChunk(file.id, n, data);
-    const updated = await StoredFile.findByIdAndUpdate(file._id, { $addToSet: { got: n } }, { new: true });
+    const updated = await StoredFile.findByIdAndUpdate(file._id, { $addToSet: { got: n } }, { returnDocument: "after" });
     res.json({ received: updated!.got.length, chunks: file.chunks });
   });
 
@@ -99,25 +117,47 @@ export function createFilesRouter(config: Config) {
     if (category?.rules?.files !== "all") throw forbidden("Files aren't allowed in this group.", "files_not_allowed");
     const chunks = Math.ceil(body.size / CHUNK_PLAIN);
     const stored = body.size + chunks * CHUNK_OVERHEAD;
-    if ((await usedBy(user._id)).bytes + stored > QUOTA_BYTES) throw conflict("Your 2 GB of files is full. Delete some media or wait until it expires.", "quota_full");
+    if ((await usedBy(user._id)).bytes + stored > QUOTA_BYTES)
+      throw conflict("Your 2 GB of files is full. Delete some media or wait until it expires.", "quota_full");
     if ((await disk()).ratio >= DISK_LIMIT) throw conflict("The server is full right now. Try again later.", "disk_full");
-    const file = await StoredFile.create({ groupId: group._id, senderId: user._id, kind: body.kind, size: stored, chunks, status: "uploading", expiresAt: uploadDeadline() });
+    const file = await StoredFile.create({
+      groupId: group._id,
+      senderId: user._id,
+      kind: body.kind,
+      size: stored,
+      chunks,
+      status: "uploading",
+      expiresAt: uploadDeadline(),
+    });
     res.status(201).json({ file: { id: file.id, chunks, chunkSize: CHUNK_PLAIN } });
   });
 
   router.get("/groups/:id/files", async (req, res) => {
     const group = await Group.findOne({ _id: new Types.ObjectId(parse(objectIdSchema, req.params.id)), members: me(req)._id });
     if (!group) throw notFound("You're not in this group.");
-    const files = await StoredFile.find({ groupId: group._id, status: { $ne: "uploading" } }).sort({ createdAt: -1 }).lean();
+    const files = await StoredFile.find({ groupId: group._id, status: { $ne: "uploading" } })
+      .sort({ createdAt: -1 })
+      .lean();
     res.json({
-      files: files.map((f) => ({ id: String(f._id), senderId: String(f.senderId), kind: f.kind, size: f.size, status: f.status, deletedReason: f.deletedReason ?? null, messageId: f.messageId ? String(f.messageId) : null, expiresAt: f.expiresAt })),
+      files: files.map((f) => ({
+        id: String(f._id),
+        senderId: String(f.senderId),
+        kind: f.kind,
+        size: f.size,
+        status: f.status,
+        deletedReason: f.deletedReason ?? null,
+        messageId: f.messageId ? String(f.messageId) : null,
+        expiresAt: f.expiresAt,
+      })),
     });
   });
 
   // The files of a chat (deleted ones too, a day long: the chat shows "removed")
   router.get("/chats/:id/files", async (req, res) => {
     const chat = await activeChat(req);
-    const files = await StoredFile.find({ chatId: chat._id, status: { $ne: "uploading" } }).sort({ createdAt: -1 }).lean();
+    const files = await StoredFile.find({ chatId: chat._id, status: { $ne: "uploading" } })
+      .sort({ createdAt: -1 })
+      .lean();
     res.json({
       files: files.map((f) => ({
         id: String(f._id),

@@ -31,7 +31,12 @@ const schema = z.object({
   TURN_URLS: z
     .string()
     .default("turn:turn.omranisystems.com:3478?transport=udp,turn:turn.omranisystems.com:3478?transport=tcp,turns:turn.omranisystems.com:5349?transport=tcp")
-    .transform((s) => s.split(",").map((u) => u.trim()).filter(Boolean)),
+    .transform((s) =>
+      s
+        .split(",")
+        .map((u) => u.trim())
+        .filter(Boolean),
+    ),
 
   // Web Push (browser notifications). Without the keys, notifications only reach open apps.
   VAPID_PUBLIC_KEY: z.string().optional(),

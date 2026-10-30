@@ -1,4 +1,4 @@
-import type { Router, } from "express";
+import type { Router } from "express";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { badRequest, notFound } from "../../lib/errors.js";
@@ -15,7 +15,9 @@ import type { AdminContext } from "./context.js";
 /** Groups: made by the administrator, or asked by a user and approved here. */
 export function registerGroups(router: Router, { admin, log }: AdminContext) {
   async function groupRows(groups: GroupFields[]) {
-    const users = await User.find({ _id: { $in: groups.flatMap((g) => [...g.members, ...(g.requestedBy ? [g.requestedBy] : [])]) } }).select("username").lean();
+    const users = await User.find({ _id: { $in: groups.flatMap((g) => [...g.members, ...(g.requestedBy ? [g.requestedBy] : [])]) } })
+      .select("username")
+      .lean();
     const names = new Map(users.map((u) => [String(u._id), u.username]));
     const categories = await Category.find().select("name").lean();
     return groups.map((g) => ({
@@ -23,11 +25,11 @@ export function registerGroups(router: Router, { admin, log }: AdminContext) {
       name: g.name,
       status: g.status,
       categoryId: g.categoryId ? String(g.categoryId) : null,
-      category: g.categoryId ? categories.find((c) => String(c._id) === String(g.categoryId))?.name ?? null : null,
+      category: g.categoryId ? (categories.find((c) => String(c._id) === String(g.categoryId))?.name ?? null) : null,
       mode: g.mode ?? null,
       retentionMinutes: g.retentionMinutes ?? null,
       members: g.members.map((m) => ({ id: String(m), username: names.get(String(m)) ?? "deleted user" })),
-      requestedBy: g.requestedBy ? names.get(String(g.requestedBy)) ?? null : null,
+      requestedBy: g.requestedBy ? (names.get(String(g.requestedBy)) ?? null) : null,
       createdAt: g.createdAt,
       lastMessageAt: g.lastMessageAt ?? null,
       messageCount: g.messageCount ?? 0,
@@ -35,7 +37,9 @@ export function registerGroups(router: Router, { admin, log }: AdminContext) {
   }
 
   router.get("/groups", admin, async (_req, res) => {
-    const groups = await Group.find({ status: { $in: ["pending", "active"] } }).sort({ status: -1, lastMessageAt: -1, createdAt: -1 }).lean<GroupFields[]>();
+    const groups = await Group.find({ status: { $in: ["pending", "active"] } })
+      .sort({ status: -1, lastMessageAt: -1, createdAt: -1 })
+      .lean<GroupFields[]>();
     res.json({ groups: await groupRows(groups), pending: groups.filter((g) => g.status === "pending").length });
   });
 
@@ -49,7 +53,8 @@ export function registerGroups(router: Router, { admin, log }: AdminContext) {
     const modes = category.rules?.modes ?? [];
     const max = (category.rules?.maxRetentionDays ?? 0) * 1440;
     const auto = retentionMinutes === AUTO_MINUTES && modes.includes("auto");
-    if (!auto && (!modes.includes("keep") || retentionMinutes > max)) throw badRequest(`${category.name} doesn't allow messages to stay that long.`, "mode_not_allowed");
+    if (!auto && (!modes.includes("keep") || retentionMinutes > max))
+      throw badRequest(`${category.name} doesn't allow messages to stay that long.`, "mode_not_allowed");
     let members = current?.members.map(String) ?? [];
     if (body.memberIds) {
       members = [...new Set(body.memberIds)];
@@ -57,24 +62,41 @@ export function registerGroups(router: Router, { admin, log }: AdminContext) {
       const ok = await User.countDocuments({ _id: { $in: members }, role: "user", status: "approved" });
       if (ok !== members.length) throw badRequest("Some of these people aren't approved users.", "bad_members");
     }
-    return { name: body.name ?? current?.name, categoryId: new Types.ObjectId(categoryId), mode: (auto ? "auto" : "keep") as "auto" | "keep", retentionMinutes, members };
+    return {
+      name: body.name ?? current?.name,
+      categoryId: new Types.ObjectId(categoryId),
+      mode: (auto ? "auto" : "keep") as "auto" | "keep",
+      retentionMinutes,
+      members,
+    };
   }
 
   /** Who joined and who left: system lines, notifications, removed members' keys dropped. */
   async function applyMembers(group: GroupDoc, before: string[], after: string[]) {
     const added = after.filter((m) => !before.includes(m));
     const removed = before.filter((m) => !after.includes(m));
-    const people = await User.find({ _id: { $in: [...added, ...removed] } }).select("username").lean();
+    const people = await User.find({ _id: { $in: [...added, ...removed] } })
+      .select("username")
+      .lean();
     for (const id of removed) {
       await dropMember(group, id);
       await systemLine(group, "removed", people.find((p) => String(p._id) === id) as never);
     }
     if (added.length) {
-      group.set("members", [...group.members.map(String).filter((m) => !added.includes(m)), ...added].map((m) => new Types.ObjectId(m)));
+      group.set(
+        "members",
+        [...group.members.map(String).filter((m) => !added.includes(m)), ...added].map((m) => new Types.ObjectId(m)),
+      );
       await group.save();
       for (const id of added) {
         await systemLine(group, "added", people.find((p) => String(p._id) === id) as never);
-        void notify(id, { kind: "contact_added", title: group.name, body: "You were added to this group.", tag: `group:${group.id}`, open: { groupId: group.id } });
+        void notify(id, {
+          kind: "contact_added",
+          title: group.name,
+          body: "You were added to this group.",
+          tag: `group:${group.id}`,
+          open: { groupId: group.id },
+        });
       }
     }
   }
@@ -111,7 +133,14 @@ export function registerGroups(router: Router, { admin, log }: AdminContext) {
     if (approving) await systemLine(group, "created");
     else if (!body.memberIds) await systemLine(group, "settings");
     await applyMembers(group, before, settings.members);
-    if (approving && group.requestedBy) void notify(group.requestedBy, { kind: "contact_added", title: group.name, body: "Your group was approved.", tag: `group:${group.id}`, open: { groupId: group.id } });
+    if (approving && group.requestedBy)
+      void notify(group.requestedBy, {
+        kind: "contact_added",
+        title: group.name,
+        body: "Your group was approved.",
+        tag: `group:${group.id}`,
+        open: { groupId: group.id },
+      });
     await log(req, approving ? "group.approved" : "group.updated", undefined, { name: group.name, members: settings.members.length });
     res.json({ group: (await groupRows([group.toObject() as GroupFields]))[0] });
   });
@@ -123,7 +152,14 @@ export function registerGroups(router: Router, { admin, log }: AdminContext) {
     group.refusedAt = new Date();
     group.purgeAt = new Date(Date.now() + 30 * 864e5);
     await group.save();
-    if (group.requestedBy) void notify(group.requestedBy, { kind: "contact_added", title: group.name, body: "The administrator didn't approve this group.", tag: `group:${group.id}`, open: {} });
+    if (group.requestedBy)
+      void notify(group.requestedBy, {
+        kind: "contact_added",
+        title: group.name,
+        body: "The administrator didn't approve this group.",
+        tag: `group:${group.id}`,
+        open: {},
+      });
     await log(req, "group.refused", group.requestedBy ?? undefined, { name: group.name });
     res.json({ ok: true });
   });

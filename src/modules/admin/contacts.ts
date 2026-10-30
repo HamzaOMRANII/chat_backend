@@ -15,7 +15,9 @@ import type { AdminContext } from "./context.js";
 export function registerContacts(router: Router, { admin, log, findUser }: AdminContext) {
   router.get("/users/:id/contacts", admin, async (req, res) => {
     const user = await findUser(req.params.id as string);
-    const friendships = await Friendship.find({ $or: [{ userA: user._id }, { userB: user._id }] }).sort({ createdAt: -1 }).lean();
+    const friendships = await Friendship.find({ $or: [{ userA: user._id }, { userB: user._id }] })
+      .sort({ createdAt: -1 })
+      .lean();
     const others = await User.find({ _id: { $in: friendships.map((f) => otherUserId(f, user._id)) } })
       .select("username status categoryIds lastSeenAt")
       .lean();
@@ -32,7 +34,13 @@ export function registerContacts(router: Router, { admin, log, findUser }: Admin
           via: f.via,
           createdAt: f.createdAt,
           acceptedAt: f.acceptedAt ?? null,
-          user: { id: String(other._id), username: other.username, status: other.status, online: presence.isOnline(other._id), lastSeenAt: other.lastSeenAt ?? null },
+          user: {
+            id: String(other._id),
+            username: other.username,
+            status: other.status,
+            online: presence.isOnline(other._id),
+            lastSeenAt: other.lastSeenAt ?? null,
+          },
           sharedCategoryIds: shared,
           categoryId: await effectiveCategoryId(shared, f.categoryId),
           categoryChosen: !!f.categoryId && shared.includes(String(f.categoryId)),
@@ -41,7 +49,11 @@ export function registerContacts(router: Router, { admin, log, findUser }: Admin
       }),
     );
     const list = rows.filter((r) => r !== null);
-    res.json({ personalId: user.personalId ?? null, contacts: list.filter((r) => r.status === "accepted"), requests: list.filter((r) => r.status === "pending") });
+    res.json({
+      personalId: user.personalId ?? null,
+      contacts: list.filter((r) => r.status === "accepted"),
+      requests: list.filter((r) => r.status === "pending"),
+    });
   });
 
   // Which shared category's rules apply to this pair.

@@ -5,7 +5,11 @@ import { Group, GroupMessage, type GroupDoc } from "../../models/group.js";
 import { deleteFiles } from "../files/service.js";
 
 /** A plain line in the group ("administrator added rami.t"): no secret, so no encryption. */
-export async function systemLine(group: GroupDoc, kind: "added" | "removed" | "left" | "created" | "settings", user?: { _id: Types.ObjectId; username: string }) {
+export async function systemLine(
+  group: GroupDoc,
+  kind: "added" | "removed" | "left" | "created" | "settings",
+  user?: { _id: Types.ObjectId; username: string },
+) {
   await GroupMessage.create({
     groupId: group._id,
     system: { kind, userId: user?._id, name: user?.username },

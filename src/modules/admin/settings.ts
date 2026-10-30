@@ -27,7 +27,9 @@ export function registerSettings(router: Router, { admin, log }: AdminContext) {
   /** Everything the backoffice configures: categories and their rules, groups and their members, settings. */
   router.get("/backup", admin, async (req, res) => {
     const [categories, groups] = await Promise.all([Category.find().sort({ order: 1 }).lean(), Group.find({ status: "active" }).lean()]);
-    const users = await User.find({ _id: { $in: groups.flatMap((g) => g.members) } }).select("username").lean();
+    const users = await User.find({ _id: { $in: groups.flatMap((g) => g.members) } })
+      .select("username")
+      .lean();
     const name = (id: unknown) => users.find((u) => String(u._id) === String(id))?.username;
     const backup = {
       app: "H_CHAT",
@@ -56,9 +58,24 @@ export function registerSettings(router: Router, { admin, log }: AdminContext) {
         backup: z.object({
           app: z.literal("H_CHAT"),
           kind: z.literal("settings-backup"),
-          settings: z.object({ minAppVersion: z.string().regex(/^\d+\.\d+\.\d+$/) }).partial().optional(),
-          categories: z.array(z.object({ name: z.string().min(1).max(40), order: z.number().int().optional(), rules: z.record(z.string(), z.unknown()) })).max(50),
-          groups: z.array(z.object({ name: z.string().min(1).max(60), category: z.string().nullable(), retentionMinutes: z.number().int().nullable(), members: z.array(z.string()).max(20) })).max(500).default([]),
+          settings: z
+            .object({ minAppVersion: z.string().regex(/^\d+\.\d+\.\d+$/) })
+            .partial()
+            .optional(),
+          categories: z
+            .array(z.object({ name: z.string().min(1).max(40), order: z.number().int().optional(), rules: z.record(z.string(), z.unknown()) }))
+            .max(50),
+          groups: z
+            .array(
+              z.object({
+                name: z.string().min(1).max(60),
+                category: z.string().nullable(),
+                retentionMinutes: z.number().int().nullable(),
+                members: z.array(z.string()).max(20),
+              }),
+            )
+            .max(500)
+            .default([]),
         }),
       }),
       req.body,
@@ -76,12 +93,22 @@ export function registerSettings(router: Router, { admin, log }: AdminContext) {
     for (const g of b.groups) {
       if (await Group.exists({ name: g.name, status: "active" })) continue;
       const category = g.category ? await Category.findOne({ name: g.category }).lean() : null;
-      const members = await User.find({ username: { $in: g.members }, role: "user", status: "approved" }).select("_id").lean();
+      const members = await User.find({ username: { $in: g.members }, role: "user", status: "approved" })
+        .select("_id")
+        .lean();
       if (!category || !g.retentionMinutes || members.length < 2) {
         skipped.push(g.name);
         continue;
       }
-      const created = await Group.create({ name: g.name, status: "active", categoryId: category._id, mode: g.retentionMinutes === AUTO_MINUTES ? "auto" : "keep", retentionMinutes: g.retentionMinutes, members: members.map((m) => m._id).slice(0, GROUP_MAX_MEMBERS), createdBy: auth(req).user._id });
+      const created = await Group.create({
+        name: g.name,
+        status: "active",
+        categoryId: category._id,
+        mode: g.retentionMinutes === AUTO_MINUTES ? "auto" : "keep",
+        retentionMinutes: g.retentionMinutes,
+        members: members.map((m) => m._id).slice(0, GROUP_MAX_MEMBERS),
+        createdBy: auth(req).user._id,
+      });
       await systemLine(created, "created");
       groups++;
     }

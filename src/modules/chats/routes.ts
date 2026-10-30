@@ -20,7 +20,10 @@ const key32 = z.string().regex(/^[A-Za-z0-9+/]{43}=$/, "invalid key");
 const sig64 = z.string().regex(/^[A-Za-z0-9+/]{86}==$/, "invalid signature");
 const nonce24 = z.string().regex(/^[A-Za-z0-9+/]{32}$/, "invalid nonce");
 // Up to 4,000 characters of text once encrypted
-const ciphertext = z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/, "invalid ciphertext").max(24_000, "message too long");
+const ciphertext = z
+  .string()
+  .regex(/^[A-Za-z0-9+/]+={0,2}$/, "invalid ciphertext")
+  .max(24_000, "message too long");
 const chatKey = z.object({ pub: key32, sig: sig64 });
 
 /** Mounted on /api: only /api/chats/… and /api/keys/… need the user session (the rest of /api passes through). */
@@ -40,7 +43,9 @@ export function createChatsRouter(config: Config) {
   }
 
   async function chatsJson(user: UserDoc, chats: ChatDoc[]) {
-    const others = await User.find({ _id: { $in: chats.map((c) => otherId(c, user._id)) } }).select("username lastSeenAt identity").lean();
+    const others = await User.find({ _id: { $in: chats.map((c) => otherId(c, user._id)) } })
+      .select("username lastSeenAt identity")
+      .lean();
     const byId = new Map(others.map((u) => [String(u._id), u]));
     const unread = await Message.aggregate<{ _id: Types.ObjectId; n: number }>([
       { $match: { recipientId: user._id, readAt: null, chatId: { $in: chats.map((c) => c._id) } } },
@@ -52,7 +57,13 @@ export function createChatsRouter(config: Config) {
       return {
         id: chat.id,
         with: other
-          ? { id: String(other._id), username: other.username, online: presence.isOnline(other._id), lastSeenAt: other.lastSeenAt ?? null, identityPub: other.identity?.signPub ?? null }
+          ? {
+              id: String(other._id),
+              username: other.username,
+              online: presence.isOnline(other._id),
+              lastSeenAt: other.lastSeenAt ?? null,
+              identityPub: other.identity?.signPub ?? null,
+            }
           : null,
         mode: chat.mode,
         retentionMinutes: chat.retentionMinutes,
@@ -84,8 +95,13 @@ export function createChatsRouter(config: Config) {
       user.identity = { deviceId: body.deviceId, signPub: body.signPub, at: new Date() };
       await user.save();
       // Contacts in open chats see "new device" and a new safety code
-      const open = await Chat.find({ participants: user._id, status: { $in: ["invited", "active"] } }).select("participants").lean();
-      bus.toUsers(open.map((c) => otherId(c, user._id)), "chats:changed");
+      const open = await Chat.find({ participants: user._id, status: { $in: ["invited", "active"] } })
+        .select("participants")
+        .lean();
+      bus.toUsers(
+        open.map((c) => otherId(c, user._id)),
+        "chats:changed",
+      );
     }
     res.json({ changed });
   });
@@ -162,7 +178,13 @@ export function createChatsRouter(config: Config) {
     bus.toUsers(chat.participants, "chats:changed");
     // The one who invited: their app opens the chat
     bus.toUsers([chat.createdBy], "chat:accepted", { chatId: chat.id, by: user.id });
-    void notify(chat.createdBy, { kind: "chat_accepted", title: user.username, body: "accepted your chat. You can write now.", tag: `chat:${chat.id}`, open: { chatId: chat.id } });
+    void notify(chat.createdBy, {
+      kind: "chat_accepted",
+      title: user.username,
+      body: "accepted your chat. You can write now.",
+      tag: `chat:${chat.id}`,
+      open: { chatId: chat.id },
+    });
     const [json] = await chatsJson(user, [chat]);
     res.json({ chat: json });
   });
@@ -223,14 +245,21 @@ export function createChatsRouter(config: Config) {
 
   router.post("/chats/:id/messages", async (req, res) => {
     const body = parse(
-      z.object({ ciphertext, nonce: nonce24, senderKeyVersion: z.number().int().min(1), recipientKeyVersion: z.number().int().min(1), fileId: objectIdSchema.optional() }),
+      z.object({
+        ciphertext,
+        nonce: nonce24,
+        senderKeyVersion: z.number().int().min(1),
+        recipientKeyVersion: z.number().int().min(1),
+        fileId: objectIdSchema.optional(),
+      }),
       req.body,
     );
     const user = me(req);
     const chat = await openChat(req, ["active"]);
     const recipientId = otherId(chat, user._id);
     const has = (userId: Types.ObjectId, version: number) => chat.keys.some((k) => String(k.userId) === String(userId) && k.version === version);
-    if (!has(user._id, body.senderKeyVersion) || !has(recipientId, body.recipientKeyVersion)) throw conflict("The chat keys changed. Reload the chat.", "stale_keys");
+    if (!has(user._id, body.senderKeyVersion) || !has(recipientId, body.recipientKeyVersion))
+      throw conflict("The chat keys changed. Reload the chat.", "stale_keys");
     // A file goes with the message once all its pieces are on the server
     const file = body.fileId ? await StoredFile.findOne({ _id: body.fileId, chatId: chat._id, senderId: user._id, status: "uploading" }) : null;
     if (body.fileId && (!file || file.got.length !== file.chunks)) throw conflict("The file isn't fully uploaded.", "file_incomplete");
@@ -267,7 +296,13 @@ export function createChatsRouter(config: Config) {
     };
     bus.toUsers([recipientId], "msg:new", { chatId: chat.id, message: json });
     // Content is encrypted: the notification only says who wrote
-    void notify(recipientId, { kind: "message", title: user.username, body: file ? "sent a file" : "New message", tag: `chat:${chat.id}`, open: { chatId: chat.id } });
+    void notify(recipientId, {
+      kind: "message",
+      title: user.username,
+      body: file ? "sent a file" : "New message",
+      tag: `chat:${chat.id}`,
+      open: { chatId: chat.id },
+    });
     res.status(201).json({ message: json });
   });
 
@@ -278,11 +313,15 @@ export function createChatsRouter(config: Config) {
     const chat = await openChat(req, ["active"]);
     const now = new Date();
     const base = { chatId: chat._id, recipientId: user._id };
-    const delivered = await Message.find({ ...base, deliveredAt: null }).select("_id").lean();
+    const delivered = await Message.find({ ...base, deliveredAt: null })
+      .select("_id")
+      .lean();
     if (delivered.length) await Message.updateMany({ ...base, deliveredAt: null }, { deliveredAt: now });
     let readIds: string[] = [];
     if (read) {
-      const unread = await Message.find({ ...base, readAt: null }).select("_id").lean();
+      const unread = await Message.find({ ...base, readAt: null })
+        .select("_id")
+        .lean();
       readIds = unread.map((m) => String(m._id));
       if (readIds.length) await Message.updateMany({ ...base, readAt: null }, { readAt: now, deliveredAt: now });
     }

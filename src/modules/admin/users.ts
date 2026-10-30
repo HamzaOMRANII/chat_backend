@@ -1,7 +1,7 @@
 import type { Router } from "express";
 import { Types } from "mongoose";
 import { z } from "zod";
-import { badRequest, conflict, } from "../../lib/errors.js";
+import { badRequest, conflict } from "../../lib/errors.js";
 import { hashSecret, numericCode } from "../../lib/secrets.js";
 import { objectIdSchema, parse } from "../../lib/validate.js";
 import { auth } from "../../middleware/auth.js";
@@ -40,7 +40,17 @@ export function registerUsers(router: Router, { admin, log, findUser, validCateg
     const latest = await DeviceEvent.aggregate([
       { $match: { userId: { $in: ids }, type: { $in: ["signup", "login"] } } },
       { $sort: { at: -1 } },
-      { $group: { _id: "$userId", type: { $first: "$type" }, at: { $first: "$at" }, deviceName: { $first: "$deviceName" }, city: { $first: "$city" }, country: { $first: "$country" }, ip: { $first: "$ip" } } },
+      {
+        $group: {
+          _id: "$userId",
+          type: { $first: "$type" },
+          at: { $first: "$at" },
+          deviceName: { $first: "$deviceName" },
+          city: { $first: "$city" },
+          country: { $first: "$country" },
+          ip: { $first: "$ip" },
+        },
+      },
     ]);
     const byUser = new Map(latest.map((e) => [String(e._id), e]));
     const counts = await User.aggregate([{ $match: { role: "user" } }, { $group: { _id: "$status", n: { $sum: 1 } } }]);

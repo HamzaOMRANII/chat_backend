@@ -69,17 +69,28 @@ export async function endCall(callId: string, reason: string, by?: string | null
   if (reason === "missed") {
     const caller = await User.findById(c.startedBy).select("username").lean();
     for (const p of c.participants.filter((p) => p !== c.startedBy)) {
-      void notify(p, { kind: "call", title: caller?.username ?? "Missed call", body: `Missed ${c.kind} call`, tag: `call:${callId}`, open: { userId: c.startedBy } });
+      void notify(p, {
+        kind: "call",
+        title: caller?.username ?? "Missed call",
+        body: `Missed ${c.kind} call`,
+        tag: `call:${callId}`,
+        open: { userId: c.startedBy },
+      });
     }
   }
 }
 
-export type StartResult = { callId: string; peer: { id: string; username: string; identityPub: string | null } } | { error: "not_contact" | "not_taking_calls" | "offline" | "busy" };
+export type StartResult =
+  | { callId: string; peer: { id: string; username: string; identityPub: string | null } }
+  | { error: "not_contact" | "not_taking_calls" | "offline" | "busy" };
 
 /** Rings the other person, if they're a contact in good standing, reachable and taking calls. */
 export async function startCall(fromId: string, toId: string, kind: "voice" | "video"): Promise<StartResult> {
   if (fromId === toId || !(await pairOptions(fromId, toId))) return { error: "not_contact" };
-  const [from, to] = await Promise.all([User.findById(fromId).select("username identity").lean(), User.findById(toId).select("username identity receiveCalls").lean()]);
+  const [from, to] = await Promise.all([
+    User.findById(fromId).select("username identity").lean(),
+    User.findById(toId).select("username identity receiveCalls").lean(),
+  ]);
   if (!from || !to) return { error: "not_contact" };
   if (to.receiveCalls === false) return { error: "not_taking_calls" };
   // App closed: a phone registered with Firebase is rung through it (tapping the notification opens the ringing call)
@@ -87,7 +98,13 @@ export async function startCall(fromId: string, toId: string, kind: "voice" | "v
   if (inCall(toId) || inCall(fromId)) return { error: "busy" };
   const call = await Call.create({ participants: [fromId, toId], startedBy: fromId, kind, status: "ringing" });
   const id = call.id as string;
-  running.set(id, { participants: [fromId, toId], startedBy: fromId, kind, active: false, timer: setTimeout(() => void endCall(id, "missed").catch(() => {}), callTiming.ringMs) });
+  running.set(id, {
+    participants: [fromId, toId],
+    startedBy: fromId,
+    kind,
+    active: false,
+    timer: setTimeout(() => void endCall(id, "missed").catch(() => {}), callTiming.ringMs),
+  });
   bus.toUsers([toId], "call:incoming", { callId: id, kind, from: { id: fromId, username: from.username, identityPub: from.identity?.signPub ?? null } });
   void notify(toId, { kind: "call", title: from.username, body: `Incoming ${kind} call`, tag: `call:${id}`, open: { userId: fromId } });
   return { callId: id, peer: { id: toId, username: to.username, identityPub: to.identity?.signPub ?? null } };
@@ -97,14 +114,20 @@ export async function startCall(fromId: string, toId: string, kind: "voice" | "v
  * Starts a call in a group: every member taking calls is rung. Members join while it runs; the newcomer connects
  * to those already in. Only the one who started it can end it for everyone.
  */
-export async function startGroupCall(fromId: string, groupId: string, kind: "voice" | "video"): Promise<{ callId: string; group: { id: string; name: string } } | { error: string }> {
+export async function startGroupCall(
+  fromId: string,
+  groupId: string,
+  kind: "voice" | "video",
+): Promise<{ callId: string; group: { id: string; name: string } } | { error: string }> {
   const group = await Group.findOne({ _id: groupId, members: fromId, status: "active" }).lean();
   if (!group) return { error: "not_member" };
   if (groupCall(groupId)) return { error: "already_running" };
   if (inCall(fromId)) return { error: "busy" };
   const members = group.members.map(String);
   const from = await User.findById(fromId).select("username identity").lean();
-  const people = await User.find({ _id: { $in: members.filter((m) => m !== fromId) } }).select("receiveCalls").lean();
+  const people = await User.find({ _id: { $in: members.filter((m) => m !== fromId) } })
+    .select("receiveCalls")
+    .lean();
   const ring = people.filter((p) => p.receiveCalls !== false).map((p) => String(p._id));
   const call = await Call.create({ participants: members, startedBy: fromId, kind, status: "ringing" });
   const id = call.id as string;
@@ -113,8 +136,20 @@ export async function startGroupCall(fromId: string, groupId: string, kind: "voi
   c.timer = setTimeout(() => void endCall(id, "missed").catch(() => {}), callTiming.ringMs);
   running.set(id, c);
   const info = { id: String(group._id), name: group.name };
-  bus.toUsers(ring, "call:incoming", { callId: id, kind, from: { id: fromId, username: from?.username ?? "?", identityPub: from?.identity?.signPub ?? null }, group: info });
-  for (const m of ring) void notify(m, { kind: "call", title: group.name, body: `Incoming ${kind} call from ${from?.username ?? "a member"}`, tag: `call:${id}`, open: { groupId } });
+  bus.toUsers(ring, "call:incoming", {
+    callId: id,
+    kind,
+    from: { id: fromId, username: from?.username ?? "?", identityPub: from?.identity?.signPub ?? null },
+    group: info,
+  });
+  for (const m of ring)
+    void notify(m, {
+      kind: "call",
+      title: group.name,
+      body: `Incoming ${kind} call from ${from?.username ?? "a member"}`,
+      tag: `call:${id}`,
+      open: { groupId },
+    });
   announceGroupCall(c);
   return { callId: id, group: info };
 }
@@ -131,7 +166,9 @@ export async function joinGroupCall(callId: string, userId: string) {
     if (c.timer) clearTimeout(c.timer);
     await Call.updateOne({ _id: callId }, { status: "active", answeredAt: new Date() });
   }
-  const people = await User.find({ _id: { $in: [...already, userId] } }).select("username identity").lean();
+  const people = await User.find({ _id: { $in: [...already, userId] } })
+    .select("username identity")
+    .lean();
   const info = (id: string) => {
     const p = people.find((x) => String(x._id) === id);
     return { id, username: p?.username ?? "?", identityPub: p?.identity?.signPub ?? null };
@@ -147,7 +184,11 @@ export async function answerCall(callId: string, userId: string) {
   c.active = true;
   if (c.timer) clearTimeout(c.timer);
   await Call.updateOne({ _id: callId }, { status: "active", answeredAt: new Date() });
-  bus.toUsers(c.participants.filter((p) => p !== userId), "call:answered", { callId, by: userId });
+  bus.toUsers(
+    c.participants.filter((p) => p !== userId),
+    "call:answered",
+    { callId, by: userId },
+  );
   return true;
 }
 
@@ -205,5 +246,8 @@ export function userBack(userId: string) {
 
 /** The server restarted: calls it was setting up are over (the media may still flow, but nobody can be reached). */
 export async function resetCalls() {
-  await Call.updateMany({ status: { $ne: "ended" } }, { status: "ended", endedAt: new Date(), endReason: "server_restart", purgeAt: new Date(Date.now() + KEEP_DAYS * 864e5) });
+  await Call.updateMany(
+    { status: { $ne: "ended" } },
+    { status: "ended", endedAt: new Date(), endReason: "server_restart", purgeAt: new Date(Date.now() + KEEP_DAYS * 864e5) },
+  );
 }

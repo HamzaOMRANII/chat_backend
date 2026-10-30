@@ -18,14 +18,21 @@ afterEach(() => vi.unstubAllGlobals());
 it("a phone's Firebase token belongs to its session: signing out deletes it", async () => {
   await approvedUser("hamza");
   const { agent } = await signIn(app, mail, "hamza");
-  await agent.post("/api/notifications/fcm").send({ token: "t".repeat(160) }).expect(200);
+  await agent
+    .post("/api/notifications/fcm")
+    .send({ token: "t".repeat(160) })
+    .expect(200);
   expect(await FcmToken.countDocuments()).toBe(1);
   await agent.post("/api/auth/logout").expect(200);
   expect(await FcmToken.countDocuments()).toBe(0);
 });
 
 it("Google only gets a generic text: never who wrote, never the content", async () => {
-  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
   const file = `${process.env.TMPDIR ?? "/tmp"}/hchat-test-fcm.json`;
   writeFileSync(file, JSON.stringify({ project_id: "test-project", client_email: "x@test.iam.gserviceaccount.com", private_key: privateKey }));
   expect(await configureFcm(file)).toBe(true);

@@ -89,7 +89,11 @@ export function createExportsRouter(config: Config) {
     const when = since ? { $gte: since } : undefined;
     const [messages, files] = await Promise.all([
       body.messages ? Message.countDocuments({ chatId: chat._id, ...(when ? { sentAt: when } : {}) }) : 0,
-      body.media ? StoredFile.find({ chatId: chat._id, status: "ready", ...(when ? { createdAt: when } : {}) }).select("size").lean() : [],
+      body.media
+        ? StoredFile.find({ chatId: chat._id, status: "ready", ...(when ? { createdAt: when } : {}) })
+            .select("size")
+            .lean()
+        : [],
     ]);
     const e = await ExportRequest.create({
       chatId: chat._id,
@@ -101,7 +105,13 @@ export function createExportsRouter(config: Config) {
       until: new Date(Date.now() + EXPORT_HOURS * 3600_000),
     });
     changed(e);
-    void notify(approverId, { kind: "export_request", title: user.username, body: "wants to export your chat. Approve or refuse.", tag: `chat:${chat.id}`, open: { chatId: chat.id } });
+    void notify(approverId, {
+      kind: "export_request",
+      title: user.username,
+      body: "wants to export your chat. Approve or refuse.",
+      tag: `chat:${chat.id}`,
+      open: { chatId: chat.id },
+    });
     res.status(201).json({ export: exportJson(e) });
   });
 

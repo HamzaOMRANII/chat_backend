@@ -75,7 +75,15 @@ export async function sendFcm(sessionId: string, n: { kind: string; tag: string;
               priority: "high",
               // A ringing call is useless after 45 s
               ttl: call ? "45s" : "86400s",
-              notification: { title: "H_CHAT", body, tag: n.tag, channel_id: call ? "hc_calls" : "hc_events", icon: "ic_stat_hchat", color: "#8C2A3F", sound: "default" },
+              notification: {
+                title: "H_CHAT",
+                body,
+                tag: n.tag,
+                channel_id: call ? "hc_calls" : "hc_events",
+                icon: "ic_stat_hchat",
+                color: "#8C2A3F",
+                sound: "default",
+              },
             },
           },
         }),

@@ -32,9 +32,13 @@ async function person(username: string, categories = ["Friends"]) {
   const user = await approvedUser(username, categories);
   const dev = device({ platform: "android" });
   const step1 = await request(url).post("/api/auth/login").set("X-Client", "android").send({ username, password: PASSWORD, device: dev });
-  const step2 = await request(url).post("/api/auth/verify-code").set("X-Client", "android").send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
+  const step2 = await request(url)
+    .post("/api/auth/verify-code")
+    .set("X-Client", "android")
+    .send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
   const token = step2.body.token as string;
-  const api = (method: "get" | "post" | "put", path: string, body?: object) => request(url)[method](path).set("Authorization", `Bearer ${token}`).set("X-Client", "android").send(body);
+  const api = (method: "get" | "post" | "put", path: string, body?: object) =>
+    request(url)[method](path).set("Authorization", `Bearer ${token}`).set("X-Client", "android").send(body);
   await api("put", "/api/keys/identity", { deviceId: dev.deviceId, signPub: randomBytes(32).toString("base64") }).expect(200);
   return { id: user.id as string, token, api };
 }
@@ -129,7 +133,14 @@ describe("calls", () => {
     const { Group } = await import("../src/models/group.js");
     const { Category } = await import("../src/models/category.js");
     const cat = (await Category.findOne({ name: "Friends" }))!;
-    const group = await Group.create({ name: "Site team", status: "active", categoryId: cat._id, mode: "keep", retentionMinutes: 1440, members: [a.id, b.id, c.id] });
+    const group = await Group.create({
+      name: "Site team",
+      status: "active",
+      categoryId: cat._id,
+      mode: "keep",
+      retentionMinutes: 1440,
+      members: [a.id, b.id, c.id],
+    });
     const [sa, sb, sc] = await Promise.all([socketOf(a.token), socketOf(b.token), socketOf(c.token)]);
     const ringB = next<{ callId: string; group: { name: string } }>(sb, "call:incoming");
     const ringC = next(sc, "call:incoming");

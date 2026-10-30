@@ -16,8 +16,13 @@ import type { AdminContext } from "./context.js";
 export function registerLive(router: Router, { admin, log, findUser }: AdminContext) {
   router.get("/live", admin, async (req, res) => {
     const q = parse(z.object({ category: objectIdSchema.optional() }), req.query);
-    const sessions = await LiveSession.find(q.category ? { categoryId: new Types.ObjectId(q.category) } : {}).sort({ invitedAt: -1 }).limit(300).lean<LiveFields[]>();
-    const users = await User.find({ _id: { $in: sessions.flatMap((s) => s.participants) } }).select("username").lean();
+    const sessions = await LiveSession.find(q.category ? { categoryId: new Types.ObjectId(q.category) } : {})
+      .sort({ invitedAt: -1 })
+      .limit(300)
+      .lean<LiveFields[]>();
+    const users = await User.find({ _id: { $in: sessions.flatMap((s) => s.participants) } })
+      .select("username")
+      .lean();
     const names = new Map(users.map((u) => [String(u._id), u.username]));
     const categories = await Category.find().select("name").lean();
     const catNames = new Map(categories.map((c) => [String(c._id), c.name]));
@@ -27,13 +32,13 @@ export function registerLive(router: Router, { admin, log, findUser }: AdminCont
         id: String(s._id),
         label: people.join(" + "),
         status: s.status,
-        category: s.categoryId ? catNames.get(String(s.categoryId)) ?? null : null,
+        category: s.categoryId ? (catNames.get(String(s.categoryId)) ?? null) : null,
         startedBy: names.get(String(s.createdBy)) ?? null,
         invitedAt: s.invitedAt,
         startedAt: s.startedAt ?? null,
         endedAt: s.endedAt ?? null,
         endReason: s.endReason ?? null,
-        endedBy: s.endedBy ? names.get(String(s.endedBy)) ?? "admin" : null,
+        endedBy: s.endedBy ? (names.get(String(s.endedBy)) ?? "admin") : null,
       };
     });
     res.json({ live: rows, now: rows.filter((r) => r.status === "active").length });
@@ -42,7 +47,9 @@ export function registerLive(router: Router, { admin, log, findUser }: AdminCont
   router.delete("/live/:id", admin, async (req, res) => {
     const live = await LiveSession.findById(parse(objectIdSchema, req.params.id));
     if (!live) throw notFound("Live chat not found");
-    const users = await User.find({ _id: { $in: live.participants } }).select("username").lean();
+    const users = await User.find({ _id: { $in: live.participants } })
+      .select("username")
+      .lean();
     await endLive(live, "deleted_by_admin");
     await log(req, "live.ended", undefined, { pair: users.map((u) => u.username).join(" + ") });
     res.json({ ok: true });

@@ -43,7 +43,10 @@ describe("approving accounts", () => {
     expect(noCategory.status).toBe(400);
 
     const pro = await Category.findOne({ name: "Pro" });
-    await admin.post(`/api/admin/users/${pending.id}/approve`).send({ categoryIds: [pro!.id] }).expect(200);
+    await admin
+      .post(`/api/admin/users/${pending.id}/approve`)
+      .send({ categoryIds: [pro!.id] })
+      .expect(200);
     const { res } = await signIn(app, mail, "leila.b");
     expect(res.status).toBe(200);
     expect(await AdminLog.countDocuments({ action: "user.approved" })).toBe(1);
@@ -119,7 +122,10 @@ describe("categories", () => {
     const secret = await Category.findOne({ name: "Secret" });
     const rules = { modes: [], maxRetentionDays: 0, files: "p2p", export: false, calls: "voice" };
     expect((await admin.patch(`/api/admin/categories/${secret!.id}`).send({ rules })).status).toBe(400);
-    await admin.patch(`/api/admin/categories/${secret!.id}`).send({ rules: { ...rules, modes: ["live"] } }).expect(200);
+    await admin
+      .patch(`/api/admin/categories/${secret!.id}`)
+      .send({ rules: { ...rules, modes: ["live"] } })
+      .expect(200);
     expect((await Category.findById(secret!.id))!.rules!.calls).toBe("voice");
 
     await approvedUser("hamza", ["Secret"]);

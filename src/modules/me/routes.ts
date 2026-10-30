@@ -19,7 +19,11 @@ export function createMeRouter(config: Config, mailer: Mailer) {
 
   // The user's own security log (same records the administrator sees), last 90 days.
   router.get("/security-log", requireUser(config), async (req, res) => {
-    const events = await DeviceEvent.find({ userId: auth(req).user._id }).sort({ at: -1 }).limit(200).select(LOG_FIELDS).lean();
+    const events = await DeviceEvent.find({ userId: auth(req).user._id })
+      .sort({ at: -1 })
+      .limit(200)
+      .select(LOG_FIELDS)
+      .lean();
     res.json({ events, current: auth(req).session.device });
   });
 

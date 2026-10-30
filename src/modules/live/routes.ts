@@ -26,7 +26,11 @@ export function createLiveRouter(config: Config) {
   const me = (req: Request) => auth(req).user;
 
   async function openLive(req: Request, statuses: ("invited" | "active")[] = ["invited", "active"]): Promise<LiveDoc> {
-    const live = await LiveSession.findOne({ _id: new Types.ObjectId(parse(objectIdSchema, req.params.id)), participants: me(req)._id, status: { $in: statuses } });
+    const live = await LiveSession.findOne({
+      _id: new Types.ObjectId(parse(objectIdSchema, req.params.id)),
+      participants: me(req)._id,
+      status: { $in: statuses },
+    });
     if (!live) throw notFound("This live chat has ended.");
     // The 5 minutes are exact, not "within the next minute"
     if (live.status === "invited" && live.inviteExpiresAt && live.inviteExpiresAt.getTime() < Date.now()) {
@@ -42,14 +46,18 @@ export function createLiveRouter(config: Config) {
   }
 
   async function liveJson(user: UserDoc, sessions: LiveDoc[]) {
-    const others = await User.find({ _id: { $in: sessions.map((s) => otherOf(s.participants, user._id)) } }).select("username identity").lean();
+    const others = await User.find({ _id: { $in: sessions.map((s) => otherOf(s.participants, user._id)) } })
+      .select("username identity")
+      .lean();
     const byId = new Map(others.map((u) => [String(u._id), u]));
     return sessions.map((s) => {
       const other = byId.get(String(otherOf(s.participants, user._id)));
       const dropped = droppedSince(s.id);
       return {
         id: s.id,
-        with: other ? { id: String(other._id), username: other.username, online: presence.isOnline(other._id), identityPub: other.identity?.signPub ?? null } : null,
+        with: other
+          ? { id: String(other._id), username: other.username, online: presence.isOnline(other._id), identityPub: other.identity?.signPub ?? null }
+          : null,
         status: s.status,
         createdByMe: String(s.createdBy) === user.id,
         invitedAt: s.invitedAt,
@@ -87,7 +95,13 @@ export function createLiveRouter(config: Config) {
       inviteExpiresAt: new Date(Date.now() + LIVE_INVITE_MINUTES * 60_000),
     });
     bus.toUsers([body.userId], "live:changed");
-    void notify(body.userId, { kind: "live_invite", title: user.username, body: `wants to chat live · ${LIVE_INVITE_MINUTES} minutes to answer`, tag: `live:${live.id}`, open: { liveId: live.id } });
+    void notify(body.userId, {
+      kind: "live_invite",
+      title: user.username,
+      body: `wants to chat live · ${LIVE_INVITE_MINUTES} minutes to answer`,
+      tag: `live:${live.id}`,
+      open: { liveId: live.id },
+    });
     const [json] = await liveJson(user, [live]);
     res.status(201).json({ live: json });
   });
@@ -110,7 +124,13 @@ export function createLiveRouter(config: Config) {
     startRunning(live);
     bus.toUsers(live.participants, "live:changed");
     bus.toUsers([live.createdBy], "live:accepted", { sessionId: live.id, by: user.id });
-    void notify(live.createdBy, { kind: "chat_accepted", title: user.username, body: "is live with you now.", tag: `live:${live.id}`, open: { liveId: live.id } });
+    void notify(live.createdBy, {
+      kind: "chat_accepted",
+      title: user.username,
+      body: "is live with you now.",
+      tag: `live:${live.id}`,
+      open: { liveId: live.id },
+    });
     const [json] = await liveJson(user, [live]);
     res.json({ live: json });
   });

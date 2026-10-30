@@ -23,7 +23,10 @@ async function chatBetween(categories = ["Friends"]) {
   for (const name of ["hamza", "leila.b"]) {
     const dev = device();
     const { agent } = await signIn(app, mail, name, dev);
-    await agent.put("/api/keys/identity").send({ deviceId: dev.deviceId, signPub: b64(32) }).expect(200);
+    await agent
+      .put("/api/keys/identity")
+      .send({ deviceId: dev.deviceId, signPub: b64(32) })
+      .expect(200);
     agents.push(agent);
   }
   const [agentA, agentB] = agents as [(typeof agents)[0], (typeof agents)[0]];
@@ -32,7 +35,11 @@ async function chatBetween(categories = ["Friends"]) {
   const invite = await agentA.post("/api/chats").send({ userId: b.id, mode: "keep", retentionMinutes: 1440, key: key() });
   await agentB.post(`/api/chats/${invite.body.chat.id}/accept`).send({ key: key() }).expect(200);
   const chatId = invite.body.chat.id as string;
-  for (let i = 0; i < 3; i++) await agentA.post(`/api/chats/${chatId}/messages`).send({ ciphertext: b64(80), nonce: b64(24), senderKeyVersion: 1, recipientKeyVersion: 1 }).expect(201);
+  for (let i = 0; i < 3; i++)
+    await agentA
+      .post(`/api/chats/${chatId}/messages`)
+      .send({ ciphertext: b64(80), nonce: b64(24), senderKeyVersion: 1, recipientKeyVersion: 1 })
+      .expect(201);
   return { agentA, agentB, chatId };
 }
 
