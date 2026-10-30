@@ -251,10 +251,23 @@ export function createAdminRouter(config: Config, mailer: Mailer) {
     const code = numericCode(10);
     user.adminResetHash = await hashSecret(code);
     user.adminResetExpiresAt = new Date(Date.now() + RESET_CODE_HOURS * 3600_000);
+    user.secureCodeHash = undefined;
+    user.secureCodeSetAt = undefined;
     await user.save();
     await revokeAllSessions(user._id, "admin");
     await log(req, "user.reset_access", user._id);
     res.json({ code, expiresAt: user.adminResetExpiresAt });
+  });
+
+  // Secure code (sign-in without the emailed code): on by default, the administrator can switch it off.
+  // Switching off keeps the code but refuses it; the user is told in Settings.
+  router.put("/users/:id/secure-code", admin, async (req, res) => {
+    const { allowed } = parse(z.object({ allowed: z.boolean() }), req.body);
+    const user = await findUser(req.params.id as string);
+    user.secureCodeDisabled = !allowed;
+    await user.save();
+    await log(req, allowed ? "user.secure_code_allowed" : "user.secure_code_disabled", user._id);
+    res.json({ allowed });
   });
 
   router.put("/users/:id/categories", admin, async (req, res) => {

@@ -30,12 +30,16 @@ export const config = loadConfig({
 /** Captures the codes the server would email. */
 export function fakeMailer() {
   const sent: { to: string; code: string; purpose: string }[] = [];
+  const alerts: { to: string; username: string; where: string }[] = [];
   const mailer: Mailer = {
     async sendCode({ to, code, purpose }) {
       sent.push({ to, code, purpose });
     },
+    async sendSecureCodeAlert({ to, username, where }) {
+      alerts.push({ to, username, where });
+    },
   };
-  return { mailer, sent, lastCode: () => sent.at(-1)!.code };
+  return { mailer, sent, alerts, lastCode: () => sent.at(-1)!.code };
 }
 
 export async function connectTestDb() {
