@@ -9,7 +9,17 @@ import { User } from "../models/user.js";
 import { authenticate, COOKIE } from "../modules/auth/sessions.js";
 import { relatedUserIds } from "../modules/contacts/service.js";
 import { peerOf, userBack, userDropped } from "../modules/live/service.js";
-import { answerCall, callOf, joinGroupCall, leaveCall, ringAgain, startCall, startGroupCall, userBack as callBack, userDropped as callDropped } from "../modules/calls/service.js";
+import {
+  answerCall,
+  callOf,
+  joinGroupCall,
+  leaveCall,
+  ringAgain,
+  startCall,
+  startGroupCall,
+  userBack as callBack,
+  userDropped as callDropped,
+} from "../modules/calls/service.js";
 import { presence } from "./presence.js";
 
 function cookieToken(header: string | undefined) {
@@ -41,7 +51,13 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
       socket.data.sessionId = session.id;
       next();
     } catch (err) {
-      logger.warn({ code: (err as { code?: string }).code, how: (socket.handshake.auth as { ticket?: string }).ticket ? "ticket" : (socket.handshake.auth as { token?: string }).token ? "token" : "cookie" }, "socket refused");
+      logger.warn(
+        {
+          code: (err as { code?: string }).code,
+          how: (socket.handshake.auth as { ticket?: string }).ticket ? "ticket" : (socket.handshake.auth as { token?: string }).token ? "token" : "cookie",
+        },
+        "socket refused",
+      );
       next(Object.assign(new Error("unauthorized"), { data: (err as { details?: unknown }).details }));
     }
   });
@@ -145,7 +161,7 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
       const p = payload as { callId?: unknown; to?: unknown; data?: unknown } | null;
       if (!isId(p?.callId) || !isId(p.to) || typeof p.data !== "object" || !p.data) return;
       const c = callOf(p.callId, userId);
-      if (!c || !c.participants.includes(p.to) || JSON.stringify(p.data).length > 30_000) return;
+      if (!c?.participants.includes(p.to) || JSON.stringify(p.data).length > 30_000) return;
       if (c.joined && (!c.joined.has(userId) || !c.joined.has(p.to))) return;
       io.to(`user:${p.to}`).emit("call:signal", { callId: p.callId, from: userId, data: p.data });
     });

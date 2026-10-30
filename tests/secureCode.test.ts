@@ -22,7 +22,9 @@ async function setSecureCode(username: string, code = SECURE) {
 }
 
 async function passwordStep(username: string) {
-  const res = await request(app).post("/api/auth/login").send({ username, password: PASSWORD, device: device({ name: "Pixel 8" }) });
+  const res = await request(app)
+    .post("/api/auth/login")
+    .send({ username, password: PASSWORD, device: device({ name: "Pixel 8" }) });
   expect(res.status).toBe(200);
   return res.body.challengeId as string;
 }
@@ -80,7 +82,9 @@ describe("signing in with the secure code", () => {
     await approvedUser("leila");
     await setSecureCode("hamza");
     const leilaChallenge = await passwordStep("leila");
-    expect((await request(app).post("/api/auth/verify-secure-code").send({ challengeId: leilaChallenge, secureCode: SECURE })).body.code).toBe("wrong_secure_code");
+    expect((await request(app).post("/api/auth/verify-secure-code").send({ challengeId: leilaChallenge, secureCode: SECURE })).body.code).toBe(
+      "wrong_secure_code",
+    );
 
     const challengeId = await passwordStep("hamza");
     const wrong = await request(app).post("/api/auth/verify-secure-code").send({ challengeId, secureCode: "99999999" });

@@ -62,7 +62,9 @@ export async function deleteFiles(files: FileDoc[], reason: string, by?: string)
     file.purgeAt = new Date(Date.now() + KEEP_DELETED_HOURS * 3600_000);
     await file.save();
     const where = file.groupId ? `group:${String(file.groupId)}` : String(file.chatId);
-    const people = file.groupId ? ((await Group.findById(file.groupId).select("members").lean())?.members.map(String) ?? [String(file.senderId)]) : [String(file.senderId), String(file.recipientId)];
+    const people = file.groupId
+      ? ((await Group.findById(file.groupId).select("members").lean())?.members.map(String) ?? [String(file.senderId)])
+      : [String(file.senderId), String(file.recipientId)];
     const entry = byChat.get(where) ?? { ids: [], people };
     entry.ids.push(file.id);
     byChat.set(where, entry);
@@ -102,7 +104,13 @@ export async function cleanupFiles() {
     if (due && !reminded.includes(due)) {
       user.set("mediaRequest.reminded", [...reminded, due]);
       await user.save();
-      void notify(user._id, { kind: "media_request", title: "Download your media", body: `Your files will be deleted in ${due === "1h" ? "1 hour" : "24 hours"}.`, tag: "media-request", open: { media: true } });
+      void notify(user._id, {
+        kind: "media_request",
+        title: "Download your media",
+        body: `Your files will be deleted in ${due === "1h" ? "1 hour" : "24 hours"}.`,
+        tag: "media-request",
+        open: { media: true },
+      });
     }
   }
   if (expired.length) {

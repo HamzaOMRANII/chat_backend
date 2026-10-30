@@ -78,7 +78,9 @@ export async function endChat(chat: ChatDoc, reason: string, by?: Types.ObjectId
   await deleteFiles(await StoredFile.find({ chatId: chat._id, status: { $ne: "deleted" } }), "chat_ended");
   bus.toUsers(chat.participants, "chat:ended", { chatId: chat.id, reason, by: by ? String(by) : null });
 
-  const people = await User.find({ _id: { $in: chat.participants } }).select("username").lean();
+  const people = await User.find({ _id: { $in: chat.participants } })
+    .select("username")
+    .lean();
   const name = (id: Types.ObjectId) => people.find((p) => String(p._id) === String(id))?.username ?? "Your contact";
   for (const userId of chat.participants) {
     if (by && String(userId) === String(by)) continue;
@@ -112,8 +114,12 @@ export async function reconcileChats(userIds: (Types.ObjectId | string)[]) {
 
 /** All open chats, for a rules change on a whole category. */
 export async function reconcileAllChats() {
-  const open = await Chat.find({ status: { $in: ["invited", "active"] } }).select("participants").lean();
-  const live = await LiveSession.find({ status: { $in: ["invited", "active"] } }).select("participants").lean();
+  const open = await Chat.find({ status: { $in: ["invited", "active"] } })
+    .select("participants")
+    .lean();
+  const live = await LiveSession.find({ status: { $in: ["invited", "active"] } })
+    .select("participants")
+    .lean();
   return reconcileChats([...open, ...live].flatMap((c) => c.participants));
 }
 

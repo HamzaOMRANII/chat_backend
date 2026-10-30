@@ -65,7 +65,9 @@ export async function endLive(live: LiveDoc, reason: string, by?: Types.ObjectId
   drops.delete(live.id);
   bus.toUsers(live.participants, "live:ended", { sessionId: live.id, reason, by: by ? String(by) : null });
 
-  const people = await User.find({ _id: { $in: live.participants } }).select("username").lean();
+  const people = await User.find({ _id: { $in: live.participants } })
+    .select("username")
+    .lean();
   for (const userId of live.participants) {
     if (by && String(userId) === String(by)) continue;
     const who = people.find((p) => String(p._id) === String(otherOf(live.participants, userId)))?.username ?? "Your contact";

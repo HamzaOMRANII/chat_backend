@@ -1,5 +1,5 @@
 import { Router, type Request } from "express";
-import { Types } from "mongoose";
+import type { Types } from "mongoose";
 import { z } from "zod";
 import type { Config } from "../../config/env.js";
 import { conflict, HttpError, notFound } from "../../lib/errors.js";
@@ -13,16 +13,7 @@ import { Lookup } from "../../models/lookup.js";
 import { User } from "../../models/user.js";
 import { reconcileChats } from "../chats/service.js";
 import { notify } from "../notify/service.js";
-import {
-  canConnect,
-  contactJson,
-  contactsView,
-  ensurePersonalId,
-  newInviteCode,
-  newPersonalId,
-  normalizeInviteCode,
-  normalizePersonalId,
-} from "./service.js";
+import { canConnect, contactJson, contactsView, ensurePersonalId, newInviteCode, newPersonalId, normalizeInviteCode, normalizePersonalId } from "./service.js";
 
 export const SEARCHES_PER_HOUR = 10;
 const INVITE_HOURS = 24;
@@ -85,10 +76,7 @@ export function createContactsRouter(config: Config) {
   // ---------- Add: personal ID (a request) or invite code (contacts at once) ----------
   // Every failure gets the same answer, so nobody can probe who exists, who blocked them or who is in which category.
   router.post("/add", async (req, res) => {
-    const body = parse(
-      z.union([z.object({ personalId: z.string().max(40) }).strict(), z.object({ inviteCode: z.string().max(40) }).strict()]),
-      req.body,
-    );
+    const body = parse(z.union([z.object({ personalId: z.string().max(40) }).strict(), z.object({ inviteCode: z.string().max(40) }).strict()]), req.body);
     const user = me(req);
     const left = await searchesLeft(user._id);
     if (left <= 0) throw new HttpError(429, "too_many_searches", "You've used your 10 searches for this hour. Try again later.", { searchesLeft: 0 });
@@ -110,7 +98,13 @@ export function createContactsRouter(config: Config) {
         existing.acceptedAt = new Date();
         await existing.save();
         bus.contactsChanged([user._id, target._id]);
-        void notify(target._id, { kind: "contact_added", title: user.username, body: "accepted your contact request", tag: `contact:${user.id}`, open: { userId: user.id } });
+        void notify(target._id, {
+          kind: "contact_added",
+          title: user.username,
+          body: "accepted your contact request",
+          tag: `contact:${user.id}`,
+          open: { userId: user.id },
+        });
         return res.json({ status: "contact", contact: contactJson(target, existing), ...details });
       }
       await Friendship.create({ ...pair(user._id, target._id), status: "pending", requestedBy: user._id, via: "id" });
@@ -133,7 +127,13 @@ export function createContactsRouter(config: Config) {
     );
     await invite.deleteOne();
     bus.contactsChanged([user._id, owner._id]);
-    void notify(owner._id, { kind: "contact_added", title: user.username, body: "used your invite code. You're now contacts.", tag: `contact:${user.id}`, open: { userId: user.id } });
+    void notify(owner._id, {
+      kind: "contact_added",
+      title: user.username,
+      body: "used your invite code. You're now contacts.",
+      tag: `contact:${user.id}`,
+      open: { userId: user.id },
+    });
     res.json({ status: "contact", contact: contactJson(owner, friendship), ...details });
   });
 
@@ -153,7 +153,13 @@ export function createContactsRouter(config: Config) {
     f.acceptedAt = new Date();
     await f.save();
     bus.contactsChanged([f.userA, f.userB]);
-    void notify(other._id, { kind: "contact_added", title: me(req).username, body: "accepted your contact request", tag: `contact:${me(req).id}`, open: { userId: me(req).id } });
+    void notify(other._id, {
+      kind: "contact_added",
+      title: me(req).username,
+      body: "accepted your contact request",
+      tag: `contact:${me(req).id}`,
+      open: { userId: me(req).id },
+    });
     res.json({ ok: true });
   });
 
@@ -168,10 +174,7 @@ export function createContactsRouter(config: Config) {
   // ---------- One contact ----------
   async function contact(req: Request) {
     const otherId = parse(objectIdSchema, req.params.userId);
-    const [f, other] = await Promise.all([
-      Friendship.findOne({ pairKey: pair(me(req)._id, otherId).pairKey, status: "accepted" }),
-      User.findById(otherId),
-    ]);
+    const [f, other] = await Promise.all([Friendship.findOne({ pairKey: pair(me(req)._id, otherId).pairKey, status: "accepted" }), User.findById(otherId)]);
     if (!f || !other || !(await canConnect(me(req), other))) throw notFound("Contact not found");
     return { f, other };
   }

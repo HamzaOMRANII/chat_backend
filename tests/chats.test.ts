@@ -28,7 +28,10 @@ type Agent = ReturnType<typeof request.agent>;
 async function deviceUser(theApp: Express, username: string) {
   const dev = device();
   const { agent } = await signIn(theApp, mail, username, dev);
-  await agent.put("/api/keys/identity").send({ deviceId: dev.deviceId, signPub: b64(32) }).expect(200);
+  await agent
+    .put("/api/keys/identity")
+    .send({ deviceId: dev.deviceId, signPub: b64(32) })
+    .expect(200);
   return agent;
 }
 
@@ -203,7 +206,10 @@ describe("ending", () => {
     const chatId = await activeChat(agentA, agentB, b.id, "keep", 5 * 1440);
     const admin = await adminAgent(app, mail);
     const friends = await Category.findOne({ name: "Friends" });
-    await admin.patch(`/api/admin/categories/${friends!.id}`).send({ rules: { ...friends!.toObject().rules, maxRetentionDays: 3 } }).expect(200);
+    await admin
+      .patch(`/api/admin/categories/${friends!.id}`)
+      .send({ rules: { ...friends!.toObject().rules, maxRetentionDays: 3 } })
+      .expect(200);
     expect((await Chat.findById(chatId))!.endReason).toBe("rules_changed");
   });
 });

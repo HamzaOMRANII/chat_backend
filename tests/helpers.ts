@@ -10,8 +10,7 @@ import { Category, seedCategories } from "../src/models/category.js";
 import { User } from "../src/models/user.js";
 
 // Local test database (user h_chat_test, readWrite on h_chat_test only); override with TEST_MONGO_URI.
-export const TEST_MONGO_URI =
-  process.env.TEST_MONGO_URI ?? "mongodb://h_chat_test:h_chat_test_local_only@127.0.0.1:27017/h_chat_test?authSource=h_chat_test";
+export const TEST_MONGO_URI = process.env.TEST_MONGO_URI ?? "mongodb://h_chat_test:h_chat_test_local_only@127.0.0.1:27017/h_chat_test?authSource=h_chat_test";
 
 export const config = loadConfig({
   NODE_ENV: "test",

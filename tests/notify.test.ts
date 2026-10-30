@@ -38,10 +38,17 @@ beforeEach(async () => {
 async function appSignIn(username: string) {
   const dev = device({ platform: "android" });
   const step1 = await request(url).post("/api/auth/login").set("X-Client", "android").send({ username, password: PASSWORD, device: dev });
-  const step2 = await request(url).post("/api/auth/verify-code").set("X-Client", "android").send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
+  const step2 = await request(url)
+    .post("/api/auth/verify-code")
+    .set("X-Client", "android")
+    .send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
   const token = step2.body.token as string;
   const as = { Authorization: `Bearer ${token}`, "X-Client": "android" };
-  await request(url).put("/api/keys/identity").set(as).send({ deviceId: dev.deviceId, signPub: Buffer.alloc(32, 1).toString("base64") }).expect(200);
+  await request(url)
+    .put("/api/keys/identity")
+    .set(as)
+    .send({ deviceId: dev.deviceId, signPub: Buffer.alloc(32, 1).toString("base64") })
+    .expect(200);
   return { token, as };
 }
 
@@ -66,7 +73,10 @@ const pushes = (n: number) => vi.waitFor(() => expect(pushed).toHaveBeenCalledTi
 
 const b64 = (n: number) => Buffer.alloc(n, 7).toString("base64");
 const key = () => ({ pub: b64(32), sig: b64(64) });
-const subscription = (n: number) => ({ endpoint: `https://push.example.com/send/${n}`, keys: { p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", auth: "tBHItJI5svbpez7KI4CCXg" } });
+const subscription = (n: number) => ({
+  endpoint: `https://push.example.com/send/${n}`,
+  keys: { p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", auth: "tBHItJI5svbpez7KI4CCXg" },
+});
 
 it("tells the other side about every event, without message content", async () => {
   await approvedUser("hamza");
@@ -97,7 +107,11 @@ it("tells the other side about every event, without message content", async () =
   expect((await acceptedNote).open.chatId).toBe(chatId);
 
   const message = next(leilaSocket, "message");
-  await request(url).post(`/api/chats/${chatId}/messages`).set(hamza.as).send({ ciphertext: b64(40), nonce: b64(24), senderKeyVersion: 1, recipientKeyVersion: 1 }).expect(201);
+  await request(url)
+    .post(`/api/chats/${chatId}/messages`)
+    .set(hamza.as)
+    .send({ ciphertext: b64(40), nonce: b64(24), senderKeyVersion: 1, recipientKeyVersion: 1 })
+    .expect(201);
   expect(await message).toMatchObject({ title: "hamza", body: "New message" });
 
   const ended = next(hamzaSocket, "chat_ended");

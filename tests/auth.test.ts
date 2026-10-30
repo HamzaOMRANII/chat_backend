@@ -54,7 +54,9 @@ describe("sign-in", () => {
     expect(mail.sent.at(-1)).toMatchObject({ to: "hamza@example.com", purpose: "login" });
 
     const agent = request.agent(app);
-    const bad = await agent.post("/api/auth/verify-code").send({ challengeId: step1.body.challengeId, code: "000000" === mail.lastCode() ? "111111" : "000000" });
+    const bad = await agent
+      .post("/api/auth/verify-code")
+      .send({ challengeId: step1.body.challengeId, code: "000000" === mail.lastCode() ? "111111" : "000000" });
     expect(bad.status).toBe(400);
     expect(bad.body.details.attemptsLeft).toBe(4);
 
@@ -77,7 +79,10 @@ describe("sign-in", () => {
 
   it("gives the Android app a token in the body and accepts it as Bearer", async () => {
     await approvedUser("hamza");
-    const step1 = await request(app).post("/api/auth/login").set("X-Client", "android").send({ username: "hamza", password: PASSWORD, device: device({ platform: "android", model: "SM-S911B", manufacturer: "samsung" }) });
+    const step1 = await request(app)
+      .post("/api/auth/login")
+      .set("X-Client", "android")
+      .send({ username: "hamza", password: PASSWORD, device: device({ platform: "android", model: "SM-S911B", manufacturer: "samsung" }) });
     const ok = await request(app).post("/api/auth/verify-code").set("X-Client", "android").send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
     expect(ok.body.token).toEqual(expect.any(String));
     expect(ok.headers["set-cookie"]).toBeUndefined();

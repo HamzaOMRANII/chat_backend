@@ -26,8 +26,14 @@ afterAll(async () => {
 beforeEach(resetTestDb);
 
 async function appSignIn(name: string, username = "hamza") {
-  const step1 = await request(url).post("/api/auth/login").set("X-Client", "android").send({ username, password: PASSWORD, device: device({ name, platform: "android" }) });
-  const step2 = await request(url).post("/api/auth/verify-code").set("X-Client", "android").send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
+  const step1 = await request(url)
+    .post("/api/auth/login")
+    .set("X-Client", "android")
+    .send({ username, password: PASSWORD, device: device({ name, platform: "android" }) });
+  const step2 = await request(url)
+    .post("/api/auth/verify-code")
+    .set("X-Client", "android")
+    .send({ challengeId: step1.body.challengeId, code: mail.lastCode() });
   return step2.body.token as string;
 }
 
@@ -103,17 +109,27 @@ it("delivers new messages, typing and chat end live", async () => {
   const key = () => ({ pub: b64(32), sig: b64(64) });
   // identity keys (device ids come from appSignIn's device())
   const me = async (token: string) => (await request(url).get("/api/me/security-log").set(as(token))).body.current.deviceId as string;
-  for (const token of [hamzaToken, leilaToken]) await request(url).put("/api/keys/identity").set(as(token)).send({ deviceId: await me(token), signPub: b64(32) }).expect(200);
+  for (const token of [hamzaToken, leilaToken])
+    await request(url)
+      .put("/api/keys/identity")
+      .set(as(token))
+      .send({ deviceId: await me(token), signPub: b64(32) })
+      .expect(200);
   const { code } = (await request(url).post("/api/contacts/invite").set(as(hamzaToken))).body;
   await request(url).post("/api/contacts/add").set(as(leilaToken)).send({ inviteCode: code }).expect(200);
-  const chatId = (await request(url).post("/api/chats").set(as(hamzaToken)).send({ userId: leila.id, mode: "keep", retentionMinutes: 1440, key: key() })).body.chat.id;
+  const chatId = (await request(url).post("/api/chats").set(as(hamzaToken)).send({ userId: leila.id, mode: "keep", retentionMinutes: 1440, key: key() })).body
+    .chat.id;
   await request(url).post(`/api/chats/${chatId}/accept`).set(as(leilaToken)).send({ key: key() }).expect(200);
 
   const leilaSocket = await openSocket(leilaToken);
   const hamzaSocket = await openSocket(hamzaToken);
 
   const arrived = new Promise<{ chatId: string; message: { ciphertext: string } }>((resolve) => leilaSocket.once("msg:new", resolve));
-  await request(url).post(`/api/chats/${chatId}/messages`).set(as(hamzaToken)).send({ ciphertext: b64(40), nonce: b64(24), senderKeyVersion: 1, recipientKeyVersion: 1 }).expect(201);
+  await request(url)
+    .post(`/api/chats/${chatId}/messages`)
+    .set(as(hamzaToken))
+    .send({ ciphertext: b64(40), nonce: b64(24), senderKeyVersion: 1, recipientKeyVersion: 1 })
+    .expect(201);
   expect((await arrived).chatId).toBe(chatId);
 
   const read = new Promise<{ read: string[] }>((resolve) => hamzaSocket.once("msg:status", resolve));

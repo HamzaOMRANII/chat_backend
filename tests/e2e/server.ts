@@ -31,7 +31,11 @@ outer.use((_req, res, next) => {
 outer.get("/__codes", (_req, res) => res.json(mail.sent));
 // Exactly what the database holds for messages, to check that no plaintext reaches the server
 outer.get("/__groupmsgs", async (_req, res) => {
-  const list = await mongoose.connection.db!.collection("groupmessages").find({ senderId: { $exists: true } }).sort({ sentAt: 1 }).toArray();
+  const list = await mongoose.connection
+    .db!.collection("groupmessages")
+    .find({ senderId: { $exists: true } })
+    .sort({ sentAt: 1 })
+    .toArray();
   const users = await mongoose.connection.db!.collection("users").find().toArray();
   const name = (id: unknown) => users.find((u) => String(u._id) === String(id))?.username;
   res.json(list.map((m) => ({ lockedFor: (m.wraps ?? []).map((w: { userId: unknown }) => name(w.userId)) })));
@@ -73,7 +77,14 @@ outer.post("/__group", express.json(), async (req, res) => {
     return res.json({ id: group.id });
   }
   const category = (await Category.findOne({ name: "Friends" }))!;
-  const group = await Group.create({ name: req.body.name, status: "active", categoryId: category._id, mode: "keep", retentionMinutes: 1440, members: users.map((u) => u._id) });
+  const group = await Group.create({
+    name: req.body.name,
+    status: "active",
+    categoryId: category._id,
+    mode: "keep",
+    retentionMinutes: 1440,
+    members: users.map((u) => u._id),
+  });
   await systemLine(group, "created");
   res.json({ id: group.id });
 });

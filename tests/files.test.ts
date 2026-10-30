@@ -23,7 +23,10 @@ const key = () => ({ pub: b64(32), sig: b64(64) });
 async function deviceUser(username: string) {
   const dev = device();
   const { agent } = await signIn(app, mail, username, dev);
-  await agent.put("/api/keys/identity").send({ deviceId: dev.deviceId, signPub: b64(32) }).expect(200);
+  await agent
+    .put("/api/keys/identity")
+    .send({ deviceId: dev.deviceId, signPub: b64(32) })
+    .expect(200);
   return agent;
 }
 
@@ -46,7 +49,11 @@ async function upload(agent: Agent, chatId: string, size: number) {
   const { id, chunks } = start.body.file;
   for (let n = 0; n < chunks; n++) {
     const plain = n < chunks - 1 ? CHUNK_PLAIN : size - (chunks - 1) * CHUNK_PLAIN;
-    await agent.put(`/api/files/${id}/chunks/${n}`).set("Content-Type", "application/octet-stream").send(randomBytes(plain + 40)).expect(200);
+    await agent
+      .put(`/api/files/${id}/chunks/${n}`)
+      .set("Content-Type", "application/octet-stream")
+      .send(randomBytes(plain + 40))
+      .expect(200);
   }
   return id as string;
 }
@@ -63,11 +70,14 @@ describe("files in a stored chat", () => {
     expect(file.status).toBe("ready");
     expect(file.expiresAt.getTime()).toBe(new Date(sent.body.message.expiresAt).getTime());
 
-    const piece = await agentB.get(`/api/files/${id}/chunks/1`).buffer(true).parse((res, cb) => {
-      const parts: Buffer[] = [];
-      res.on("data", (c: Buffer) => parts.push(c));
-      res.on("end", () => cb(null, Buffer.concat(parts)));
-    });
+    const piece = await agentB
+      .get(`/api/files/${id}/chunks/1`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const parts: Buffer[] = [];
+        res.on("data", (c: Buffer) => parts.push(c));
+        res.on("end", () => cb(null, Buffer.concat(parts)));
+      });
     expect(piece.status).toBe(200);
     expect((piece.body as Buffer).length).toBe(1040);
     expect((await agentB.get(`/api/chats/${chatId}/files`)).body.files).toMatchObject([{ id, status: "ready", kind: "document" }]);
@@ -83,7 +93,9 @@ describe("files in a stored chat", () => {
     const { agentA, chatId } = await chatBetween();
     const start = await agentA.post(`/api/chats/${chatId}/files`).send({ kind: "image", size: 5000 });
     expect((await agentA.post(`/api/chats/${chatId}/messages`).send(message(start.body.file.id))).body.code).toBe("file_incomplete");
-    expect((await agentA.put(`/api/files/${start.body.file.id}/chunks/0`).set("Content-Type", "application/octet-stream").send(randomBytes(10))).body.code).toBe("bad_piece");
+    expect(
+      (await agentA.put(`/api/files/${start.body.file.id}/chunks/0`).set("Content-Type", "application/octet-stream").send(randomBytes(10))).body.code,
+    ).toBe("bad_piece");
     expect((await agentA.post(`/api/chats/${chatId}/files`).send({ kind: "video", size: 101 * 1024 * 1024 })).status).toBe(400);
   });
 
@@ -94,7 +106,16 @@ describe("files in a stored chat", () => {
 
   it("count against the sender's 2 GB", async () => {
     const { a, agentA, chatId } = await chatBetween();
-    await StoredFile.create({ chatId, senderId: a.id, recipientId: a.id, kind: "video", size: 2 * 1024 ** 3 - 50, chunks: 1, status: "ready", expiresAt: new Date(Date.now() + 3600_000) });
+    await StoredFile.create({
+      chatId,
+      senderId: a.id,
+      recipientId: a.id,
+      kind: "video",
+      size: 2 * 1024 ** 3 - 50,
+      chunks: 1,
+      status: "ready",
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
     expect((await agentA.post(`/api/chats/${chatId}/files`).send({ kind: "image", size: 100 })).body.code).toBe("quota_full");
     expect((await agentA.get("/api/media")).body).toMatchObject({ files: 1, limit: 2 * 1024 ** 3 });
   });
@@ -141,4 +162,3 @@ describe("storage in the backoffice", () => {
     expect((await StoredFile.findById(id))!.deletedReason).toBe("removed_by_admin");
   });
 });
-

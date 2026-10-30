@@ -161,7 +161,10 @@ describe("remove, block, pause", () => {
     const admin = await adminAgent(app, mail);
     const pro = await Category.findOne({ name: "Pro" });
     const friends = await Category.findOne({ name: "Friends" });
-    await admin.put(`/api/admin/users/${b.id}/categories`).send({ categoryIds: [pro!.id] }).expect(200);
+    await admin
+      .put(`/api/admin/users/${b.id}/categories`)
+      .send({ categoryIds: [pro!.id] })
+      .expect(200);
     expect((await agentA.get("/api/contacts")).body.contacts).toHaveLength(0);
     expect((await agentB.get(`/api/contacts/${a.id}`)).status).toBe(404);
 
@@ -169,7 +172,10 @@ describe("remove, block, pause", () => {
     expect(view.personalId).toBe(a.personalId);
     expect(view.contacts).toEqual([expect.objectContaining({ paused: true, categoryId: null, via: "invite" })]);
 
-    await admin.put(`/api/admin/users/${b.id}/categories`).send({ categoryIds: [pro!.id, friends!.id] }).expect(200);
+    await admin
+      .put(`/api/admin/users/${b.id}/categories`)
+      .send({ categoryIds: [pro!.id, friends!.id] })
+      .expect(200);
     expect((await agentA.get("/api/contacts")).body.contacts).toHaveLength(1);
   });
 });
@@ -201,7 +207,10 @@ describe("backoffice", () => {
     const admin = await adminAgent(app, mail);
     const pending = await User.create({ username: "rami.t", email: "rami@example.com", passwordHash: "x", passcodeHash: "x" });
     const friends = await Category.findOne({ name: "Friends" });
-    await admin.post(`/api/admin/users/${pending.id}/approve`).send({ categoryIds: [friends!.id] }).expect(200);
+    await admin
+      .post(`/api/admin/users/${pending.id}/approve`)
+      .send({ categoryIds: [friends!.id] })
+      .expect(200);
     expect((await User.findById(pending.id))!.personalId).toMatch(/^HC-[2-9A-Z]{4}-[2-9A-Z]{4}$/);
 
     const { b, agentA } = await twoUsers();

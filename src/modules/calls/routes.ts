@@ -19,7 +19,8 @@ export function createCallsRouter(config: Config) {
   // A device's numbers about a call's sound (bytes, levels, player state): logged to find audio problems
   router.post("/calls/diag", (req, res) => {
     const body = parse(z.object({ callId: z.string().max(40), data: z.record(z.string(), z.unknown()) }), req.body);
-    if (JSON.stringify(body.data).length < 4000) logger.info({ user: auth(req).user.username, platform: auth(req).session.device?.platform, callId: body.callId, ...body.data }, "call audio");
+    if (JSON.stringify(body.data).length < 4000)
+      logger.info({ user: auth(req).user.username, platform: auth(req).session.device?.platform, callId: body.callId, ...body.data }, "call audio");
     res.json({ ok: true });
   });
 

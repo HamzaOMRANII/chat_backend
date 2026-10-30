@@ -27,10 +27,18 @@ describe("release 1.0", () => {
     const b = await approvedUser("leila.b");
     const adm = await adminAgent(app, mail);
     const friends = (await Category.findOne({ name: "Friends" }))!;
-    await adm.post("/api/admin/groups").send({ name: "Site team", categoryId: friends.id, retentionMinutes: 1440, memberIds: [a.id, b.id] }).expect(201);
+    await adm
+      .post("/api/admin/groups")
+      .send({ name: "Site team", categoryId: friends.id, retentionMinutes: 1440, memberIds: [a.id, b.id] })
+      .expect(201);
     await adm.put("/api/admin/settings").send({ minAppVersion: "0.9.0" }).expect(200);
     const backup = (await adm.get("/api/admin/backup")).body;
-    expect(backup).toMatchObject({ app: "H_CHAT", kind: "settings-backup", settings: { minAppVersion: "0.9.0" }, groups: [{ name: "Site team", category: "Friends", members: ["hamza", "leila.b"] }] });
+    expect(backup).toMatchObject({
+      app: "H_CHAT",
+      kind: "settings-backup",
+      settings: { minAppVersion: "0.9.0" },
+      groups: [{ name: "Site team", category: "Friends", members: ["hamza", "leila.b"] }],
+    });
     expect(JSON.stringify(backup)).not.toMatch(/ciphertext|password|identity/);
 
     await Group.deleteMany({});
