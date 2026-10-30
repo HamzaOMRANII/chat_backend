@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import type { Types } from "mongoose";
 import { bus } from "../../lib/events.js";
 import { StoredFile } from "../../models/file.js";
 import { Group, GroupMessage, type GroupDoc } from "../../models/group.js";

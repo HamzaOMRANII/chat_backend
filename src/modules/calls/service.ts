@@ -47,7 +47,7 @@ const announceGroupCall = (c: Running) => c.groupId && bus.toUsers(c.participant
 
 export const callOf = (callId: string, userId: string) => {
   const c = running.get(callId);
-  return c && c.participants.includes(userId) ? c : null;
+  return c?.participants.includes(userId) ? c : null;
 };
 
 export async function endCall(callId: string, reason: string, by?: string | null) {

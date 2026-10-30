@@ -1,6 +1,6 @@
 import type { CookieOptions, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { Types } from "mongoose";
+import type { Types } from "mongoose";
 import type { Config } from "../../config/env.js";
 import type { DeviceSnapshot } from "../../lib/device.js";
 import { bus } from "../../lib/events.js";
@@ -224,7 +224,7 @@ export async function authenticate(config: Config, token: string | undefined, al
     });
   }
   const user = await User.findById(session.userId);
-  if (!user || user.status !== "approved") throw unauthorized("This account can't be used.", "account_unavailable");
+  if (user?.status !== "approved") throw unauthorized("This account can't be used.", "account_unavailable");
   if (payload.kind === "admin" ? user.role !== "admin" : user.role !== "user") throw unauthorized();
   return { user, session };
 }

@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { Types } from "mongoose";
+import type { Types } from "mongoose";
 import { Block } from "../../models/block.js";
 import { Category } from "../../models/category.js";
 import { Friendship, otherUserId } from "../../models/friendship.js";
@@ -81,7 +81,7 @@ export async function contactsView(me: UserDoc) {
   const outgoing = [];
   for (const f of friendships) {
     const other = byId.get(String(otherUserId(f, me._id)));
-    if (!other || other.status !== "approved" || !sharedCategoryIds(me, other).length) continue;
+    if (other?.status !== "approved" || !sharedCategoryIds(me, other).length) continue;
     if (f.status === "accepted") contacts.push(contactJson(other, f));
     else if (String(f.requestedBy) === String(me._id)) outgoing.push({ id: String(f._id), username: other.username, at: f.createdAt });
     else incoming.push({ id: String(f._id), username: other.username, at: f.createdAt });

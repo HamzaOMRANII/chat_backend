@@ -145,7 +145,7 @@ export function createRealtime(httpServer: HttpServer, config: Config) {
       const p = payload as { callId?: unknown; to?: unknown; data?: unknown } | null;
       if (!isId(p?.callId) || !isId(p.to) || typeof p.data !== "object" || !p.data) return;
       const c = callOf(p.callId, userId);
-      if (!c || !c.participants.includes(p.to) || JSON.stringify(p.data).length > 30_000) return;
+      if (!c?.participants.includes(p.to) || JSON.stringify(p.data).length > 30_000) return;
       if (c.joined && (!c.joined.has(userId) || !c.joined.has(p.to))) return;
       io.to(`user:${p.to}`).emit("call:signal", { callId: p.callId, from: userId, data: p.data });
     });

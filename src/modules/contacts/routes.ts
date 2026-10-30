@@ -1,5 +1,5 @@
 import { Router, type Request } from "express";
-import { Types } from "mongoose";
+import type { Types } from "mongoose";
 import { z } from "zod";
 import type { Config } from "../../config/env.js";
 import { conflict, HttpError, notFound } from "../../lib/errors.js";

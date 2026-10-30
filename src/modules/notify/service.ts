@@ -50,7 +50,7 @@ export function configurePush(config: Config) {
 export async function notify(userId: Types.ObjectId | string, n: Omit<Notification, "system">) {
   try {
     const user = await User.findById(userId).select("notify activeSessionId status").lean();
-    if (!user || user.status !== "approved") return;
+    if (user?.status !== "approved") return;
     // A ringing call always reaches the phone (the "Receive calls" setting is what turns calls off)
     const system = n.kind === "call" && n.body.startsWith("Incoming") ? true : user.notify?.[PREF[n.kind]] !== false;
     bus.toUsers([userId], "notify", { ...n, system });
