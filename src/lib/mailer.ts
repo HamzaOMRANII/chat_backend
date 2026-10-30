@@ -3,7 +3,11 @@ import type { Config } from "../config/env.js";
 
 export type Mailer = {
   sendCode(input: { to: string; code: string; purpose: "login" | "admin-login" | "email-change"; minutes: number }): Promise<void>;
+  /** Security alert: someone signed in with the account's secure code instead of the emailed code. */
+  sendSecureCodeAlert(input: { to: string; username: string; at: Date; where: string }): Promise<void>;
 };
+
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 const SUBJECTS = {
   login: "Your H_CHAT sign-in code",
@@ -33,6 +37,23 @@ export function createMailer(config: Config): Mailer {
 <p>${subject}:</p>
 <p style="font-family:monospace;font-size:32px;font-weight:bold;letter-spacing:8px">${code}</p>
 <p>It expires in ${minutes} minutes and works once. If you didn't ask for it, change your H_CHAT password.</p></div>`,
+      });
+    },
+
+    async sendSecureCodeAlert({ to, username, at, where }) {
+      const subject = "H_CHAT sign-in with your secure code";
+      const when = at.toUTCString();
+      const advice = "If this wasn't you, change your password and your secure code in Settings, or ask the administrator to switch the secure code off.";
+      await transporter.sendMail({
+        from: `H_CHAT <${config.EMAIL_FROM}>`,
+        to,
+        subject,
+        text: `${subject}\n\nAccount: ${username}\nWhen: ${when}\nDevice: ${where}\n\n${advice}`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#111">
+<p style="font-family:monospace;font-size:18px;font-weight:bold">H<span style="color:#8C2A3F">_</span>CHAT</p>
+<p><strong>${subject}</strong></p>
+<p>Account: <strong>${escapeHtml(username)}</strong><br>When: ${when}<br>Device: ${escapeHtml(where)}</p>
+<p>${advice}</p></div>`,
       });
     },
   };

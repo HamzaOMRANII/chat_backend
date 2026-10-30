@@ -48,6 +48,11 @@ const userSchema = new Schema(
     // One-time code the admin hands out when someone lost both email and passcode
     adminResetHash: { type: String, select: false },
     adminResetExpiresAt: Date,
+    // Secure code: the user's own 8–12 digits, typed instead of the emailed code (hidden field, 5 taps).
+    // Cleared by any credentials reset; the administrator can switch it off per user.
+    secureCodeHash: { type: String, select: false },
+    secureCodeSetAt: Date,
+    secureCodeDisabled: { type: Boolean, default: false },
 
     failedAttempts: { type: Number, default: 0 },
     lockedUntil: Date,
@@ -64,6 +69,7 @@ userSchema.set("toJSON", {
     delete ret.passwordHash;
     delete ret.passcodeHash;
     delete ret.adminResetHash;
+    delete ret.secureCodeHash;
     delete ret.__v;
     return ret;
   },

@@ -6,7 +6,7 @@ import { clientDeviceSchema, deviceSnapshot, type DeviceSnapshot } from "../../l
 import { badRequest, conflict, forbidden, HttpError, locked, unauthorized } from "../../lib/errors.js";
 import type { Mailer } from "../../lib/mailer.js";
 import { hashSecret, maskEmail, numericCode, sameHash, sha256, verifySecret } from "../../lib/secrets.js";
-import { codeSchema, emailSchema, loginFilter, loginIdSchema, objectIdSchema, parse, passcodeSchema, passwordSchema, usernameSchema } from "../../lib/validate.js";
+import { codeSchema, emailSchema, loginFilter, loginIdSchema, objectIdSchema, parse, passcodeSchema, passwordSchema, secureCodeSchema, usernameSchema } from "../../lib/validate.js";
 import { auth, requireUser } from "../../middleware/auth.js";
 import { Challenge } from "../../models/challenge.js";
 import { DeviceEvent } from "../../models/deviceEvent.js";
@@ -73,6 +73,12 @@ export async function openChallenge(challengeId: string, purpose: "login" | "adm
   if (isLocked(user)) throw locked("Too many wrong attempts. Try again in 30 minutes.");
   return { challenge, user };
 }
+
+/** "Pixel 8 · Android 15 · Da Nang, VN · 1.2.3.4" for the secure-code alert email. */
+const describeDevice = (d?: DeviceSnapshot) =>
+  [d?.name || d?.model || [d?.browser, d?.os].filter(Boolean).join(" on "), [d?.city, d?.country].filter(Boolean).join(", "), d?.ip]
+    .filter(Boolean)
+    .join(" · ") || "unknown device";
 
 /** Checks a 6-digit code against a challenge; wrong codes count toward the attempt and lock limits. */
 export async function checkCode(challenge: Awaited<ReturnType<typeof openChallenge>>["challenge"], user: UserDoc, code: string) {
@@ -152,6 +158,32 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
     res.json({ user: publicUser(user), lastLogin: await previousLogin(user._id), ...deliverToken(req, res, config, "user", token) });
   });
 
+  // Step 2 (hidden): the user's own secure code instead of the emailed one. Same attempt and lock limits;
+  // an alert email is sent on every use. Unset or switched-off codes answer like a wrong code.
+  router.post("/verify-secure-code", authLimiter, async (req, res) => {
+    const body = parse(z.object({ challengeId: objectIdSchema, secureCode: secureCodeSchema }), req.body);
+    const { challenge, user } = await openChallenge(body.challengeId, "login");
+    const d = challenge.device as DeviceSnapshot;
+    const withCode = await User.findById(user._id).select("+secureCodeHash");
+    const usable = withCode?.secureCodeHash && !withCode.secureCodeDisabled;
+    if (!usable || !(await verifySecret(withCode.secureCodeHash!, body.secureCode))) {
+      challenge.attempts += 1;
+      if (challenge.attempts >= CODE_ATTEMPTS) await challenge.deleteOne();
+      else await challenge.save();
+      await registerFailure(user, d);
+      await recordEvent(user._id, "failed_secure_code", d);
+      const left = CODE_ATTEMPTS - challenge.attempts;
+      throw new HttpError(400, "wrong_secure_code", left > 0 ? "Wrong secure code." : "Too many wrong codes. Sign in again.", { attemptsLeft: Math.max(left, 0) });
+    }
+    await challenge.deleteOne();
+    await clearFailures(user);
+    const { token } = await startSession(config, user, user.mustReset ? "reset" : "user", d);
+    await recordEvent(user._id, "secure_code_used", d);
+    // The sign-in already succeeded: a mail outage must not undo it
+    mailer.sendSecureCodeAlert({ to: user.email, username: user.username, at: new Date(), where: describeDevice(d) }).catch(() => {});
+    res.json({ user: publicUser(user), lastLogin: await previousLogin(user._id), ...deliverToken(req, res, config, "user", token) });
+  });
+
   // Step 2b: lost access to email -> the memorised recovery passcode. Works once: a reset follows.
   router.post("/verify-passcode", authLimiter, async (req, res) => {
     const body = parse(z.object({ challengeId: objectIdSchema, passcode: passcodeSchema }), req.body);
@@ -203,6 +235,9 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
     user.passwordHash = await hashSecret(body.password);
     user.passcodeHash = await hashSecret(body.passcode);
     user.mustReset = false;
+    // A recovery sign-in may mean the old secrets leaked: the secure code goes too (set it again in Settings)
+    user.secureCodeHash = undefined;
+    user.secureCodeSetAt = undefined;
     user.credentialsChangedAt = new Date();
     await user.save();
     const d = session.device ? ({ ...session.device, name: session.device.name ?? "" } as DeviceSnapshot) : undefined;

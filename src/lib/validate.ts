@@ -27,5 +27,6 @@ export const loginIdSchema = z
 export const loginFilter = (id: string) => (id.includes("@") ? { email: id } : { username: id });
 export const passwordSchema = z.string().min(12, "use at least 12 characters").max(200);
 export const passcodeSchema = z.string().regex(/^\d{8}$/, "the recovery passcode is exactly 8 digits");
+export const secureCodeSchema = z.string().regex(/^\d{8,12}$/, "the secure code is 8 to 12 digits");
 export const codeSchema = z.string().regex(/^\d{6}$/, "the code is 6 digits");
 export const objectIdSchema = z.string().regex(/^[a-f0-9]{24}$/, "invalid id");

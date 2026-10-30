@@ -83,3 +83,8 @@ OPEN IDEAS (not started)
 ------------------------
   - Full-screen ring over the lock screen for incoming calls (Android ConnectionService / full-screen intent)
   - Viewing view-only PDFs inside the app (document reader)
+
+2026-10-30 — PASSWORD RESET (owner's request, session 10aa92b4)
+  User hamza.omrani.it@gmail.com (username "hamza", approved) password set directly in MongoDB (Argon2id, same as
+  hashSecret), failedAttempts 0, lockedUntil cleared, credentialsChangedAt = now. Passcode/secure code untouched.
+  Backup before: /root/backups/h_chat/users-before-password-reset-2026-10-30.archive.gz
