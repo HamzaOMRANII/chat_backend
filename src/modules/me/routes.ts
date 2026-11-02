@@ -9,8 +9,7 @@ import { auth, requireUser } from "../../middleware/auth.js";
 import { DeviceEvent } from "../../models/deviceEvent.js";
 import { User } from "../../models/user.js";
 import { checkCode, openChallenge, publicUser, sendCodeChallenge } from "../auth/routes.js";
-import { recordEvent } from "../auth/sessions.js";
-import type { DeviceSnapshot } from "../../lib/device.js";
+import { deviceOf, recordEvent } from "../auth/sessions.js";
 
 const LOG_FIELDS = "type deviceName platform model osVersion appVersion browser os ip country city at";
 
@@ -55,11 +54,6 @@ export function createMeRouter(config: Config, mailer: Mailer) {
     res.json({ set: Boolean(user.secureCodeSetAt), setAt: user.secureCodeSetAt ?? null, allowed: !user.secureCodeDisabled });
   });
 
-  const sessionDevice = (req: Parameters<typeof auth>[0]) => {
-    const d = auth(req).session.device;
-    return d ? ({ ...d, name: d.name ?? "" } as DeviceSnapshot) : undefined;
-  };
-
   // Setting or removing it needs the current password, so an unlocked phone alone can't change it.
   const withPassword = async (userId: unknown, password: string) => {
     const user = await User.findById(userId).select("+passwordHash +passcodeHash");
@@ -75,7 +69,7 @@ export function createMeRouter(config: Config, mailer: Mailer) {
     user.secureCodeHash = await hashSecret(body.secureCode);
     user.secureCodeSetAt = new Date();
     await user.save();
-    await recordEvent(user._id, "secure_code_set", sessionDevice(req));
+    await recordEvent(user._id, "secure_code_set", deviceOf(auth(req).session));
     res.json({ set: true, setAt: user.secureCodeSetAt, allowed: true });
   });
 
@@ -85,7 +79,7 @@ export function createMeRouter(config: Config, mailer: Mailer) {
     user.secureCodeHash = undefined;
     user.secureCodeSetAt = undefined;
     await user.save();
-    await recordEvent(user._id, "secure_code_removed", sessionDevice(req));
+    await recordEvent(user._id, "secure_code_removed", deviceOf(auth(req).session));
     res.json({ set: false, setAt: null, allowed: !user.secureCodeDisabled });
   });
 

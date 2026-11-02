@@ -48,6 +48,10 @@ const sessionDevice = (d?: DeviceSnapshot) =>
     city: d.city,
   };
 
+/** A session's stored device as a snapshot for the security log (older sessions may have no name). */
+export const deviceOf = (session: Pick<SessionDoc, "device">): DeviceSnapshot | undefined =>
+  session.device ? ({ ...session.device, name: session.device.name ?? "" } as DeviceSnapshot) : undefined;
+
 export async function recordEvent(userId: Types.ObjectId | string, type: DeviceEventFields["type"], d?: DeviceSnapshot) {
   await DeviceEvent.create({
     userId,

@@ -26,6 +26,7 @@ import {
   clearFailures,
   clearToken,
   deliverToken,
+  deviceOf,
   isLocked,
   recordEvent,
   registerFailure,
@@ -91,18 +92,33 @@ const describeDevice = (d?: DeviceSnapshot) =>
     .filter(Boolean)
     .join(" · ") || "unknown device";
 
-/** Checks a 6-digit code against a challenge; wrong codes count toward the attempt and lock limits. */
-export async function checkCode(challenge: Awaited<ReturnType<typeof openChallenge>>["challenge"], user: UserDoc, code: string) {
-  if (sameHash(challenge.codeHash, sha256(code))) return;
+type OpenChallenge = Awaited<ReturnType<typeof openChallenge>>["challenge"];
+
+/**
+ * A wrong answer to a challenge (email code or secure code): uses one of its 5 attempts (the 5th deletes it),
+ * counts toward the account lock, goes to the security log, and throws with the attempts left.
+ */
+async function countWrongAnswer(
+  challenge: OpenChallenge,
+  user: UserDoc,
+  event: "failed_code" | "failed_secure_code",
+  code: string,
+  message: (left: number) => string,
+): Promise<never> {
+  const device = challenge.device as DeviceSnapshot | undefined;
   challenge.attempts += 1;
   if (challenge.attempts >= CODE_ATTEMPTS) await challenge.deleteOne();
   else await challenge.save();
-  await registerFailure(user, challenge.device as DeviceSnapshot | undefined);
-  await recordEvent(user._id, "failed_code", challenge.device as DeviceSnapshot | undefined);
+  await registerFailure(user, device);
+  await recordEvent(user._id, event, device);
   const left = CODE_ATTEMPTS - challenge.attempts;
-  throw new HttpError(400, "wrong_code", left > 0 ? `Wrong code. ${left} attempt${left === 1 ? "" : "s"} left.` : "Too many wrong codes. Sign in again.", {
-    attemptsLeft: Math.max(left, 0),
-  });
+  throw new HttpError(400, code, left > 0 ? message(left) : "Too many wrong codes. Sign in again.", { attemptsLeft: Math.max(left, 0) });
+}
+
+/** Checks a 6-digit code against a challenge; wrong codes count toward the attempt and lock limits. */
+export async function checkCode(challenge: OpenChallenge, user: UserDoc, code: string) {
+  if (sameHash(challenge.codeHash, sha256(code))) return;
+  await countWrongAnswer(challenge, user, "failed_code", "wrong_code", (left) => `Wrong code. ${left} attempt${left === 1 ? "" : "s"} left.`);
 }
 
 export function createAuthRouter(config: Config, mailer: Mailer) {
@@ -178,15 +194,7 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
     const withCode = await User.findById(user._id).select("+secureCodeHash");
     const usable = withCode?.secureCodeHash && !withCode.secureCodeDisabled;
     if (!usable || !(await verifySecret(withCode.secureCodeHash!, body.secureCode))) {
-      challenge.attempts += 1;
-      if (challenge.attempts >= CODE_ATTEMPTS) await challenge.deleteOne();
-      else await challenge.save();
-      await registerFailure(user, d);
-      await recordEvent(user._id, "failed_secure_code", d);
-      const left = CODE_ATTEMPTS - challenge.attempts;
-      throw new HttpError(400, "wrong_secure_code", left > 0 ? "Wrong secure code." : "Too many wrong codes. Sign in again.", {
-        attemptsLeft: Math.max(left, 0),
-      });
+      await countWrongAnswer(challenge, user, "failed_secure_code", "wrong_secure_code", () => "Wrong secure code.");
     }
     await challenge.deleteOne();
     await clearFailures(user);
@@ -253,7 +261,7 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
     user.secureCodeSetAt = undefined;
     user.credentialsChangedAt = new Date();
     await user.save();
-    const d = session.device ? ({ ...session.device, name: session.device.name ?? "" } as DeviceSnapshot) : undefined;
+    const d = deviceOf(session);
     await revokeAllSessions(user._id, "credentials_changed");
     const { token } = await startSession(config, user, "user", d);
     await recordEvent(user._id, "credentials_reset", d);
@@ -263,7 +271,7 @@ export function createAuthRouter(config: Config, mailer: Mailer) {
   router.post("/logout", requireUser(config, { allowReset: true }), async (req, res) => {
     const { user, session } = auth(req);
     await revokeSession(session, "logout");
-    await recordEvent(user._id, "logout", session.device ? ({ ...session.device, name: session.device.name ?? "" } as DeviceSnapshot) : undefined);
+    await recordEvent(user._id, "logout", deviceOf(session));
     clearToken(res, config, "user");
     res.json({ ok: true });
   });

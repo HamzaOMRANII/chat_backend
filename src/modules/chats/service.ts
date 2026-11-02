@@ -127,9 +127,18 @@ export async function reconcileAllChats() {
 export async function expireChats() {
   const now = Date.now();
   for (const chat of await Chat.find({ status: "invited", inviteExpiresAt: { $lt: new Date(now) } })) await endChat(chat, "invite_expired");
-  const active = await Chat.find({ status: "active" });
-  for (const chat of active) {
-    const last = (chat.lastMessageAt ?? chat.acceptedAt ?? chat.invitedAt)!.getTime();
-    if (last + chat.retentionMinutes * 60_000 < now && !(await Message.exists({ chatId: chat._id }))) await endChat(chat, "expired");
-  }
+  // Only chats quiet for longer than their retention (the database filters), then one query for those that
+  // still hold a message: two queries a minute however many chats are open.
+  const quiet = await Chat.find({
+    status: "active",
+    $expr: {
+      $lt: [
+        { $add: [{ $ifNull: ["$lastMessageAt", { $ifNull: ["$acceptedAt", "$invitedAt"] }] }, { $multiply: ["$retentionMinutes", 60_000] }] },
+        new Date(now),
+      ],
+    },
+  });
+  if (!quiet.length) return;
+  const withMessages = new Set((await Message.distinct("chatId", { chatId: { $in: quiet.map((c) => c._id) } })).map(String));
+  for (const chat of quiet) if (!withMessages.has(chat.id)) await endChat(chat, "expired");
 }

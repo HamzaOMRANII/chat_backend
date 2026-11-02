@@ -247,3 +247,28 @@ describe("backoffice", () => {
     expect(await Message.countDocuments()).toBe(0);
   });
 });
+
+describe("expiry job", () => {
+  it("ends only active chats quiet for longer than their retention and holding no message", async () => {
+    const { b, agentA, agentB } = await contacts();
+    const chatId = await activeChat(agentA, agentB, b.id, "keep", 30);
+    const longAgo = new Date(Date.now() - 31 * 60_000);
+
+    // Recent activity: stays open
+    await expireChats();
+    expect((await Chat.findById(chatId))!.status).toBe("active");
+
+    // Quiet for longer than 30 min but a message is still stored: stays open
+    await agentA.post(`/api/chats/${chatId}/messages`).send(encrypted()).expect(201);
+    await Chat.updateOne({ _id: chatId }, { lastMessageAt: longAgo });
+    await expireChats();
+    expect((await Chat.findById(chatId))!.status).toBe("active");
+
+    // Quiet and empty: ends as "expired"
+    await Message.deleteMany({ chatId });
+    await expireChats();
+    const ended = (await Chat.findById(chatId))!;
+    expect(ended.status).toBe("ended");
+    expect(ended.endReason).toBe("expired");
+  });
+});
