@@ -21,6 +21,7 @@ import { createGroupsRouter } from "./modules/groups/routes.js";
 import { configureMedia } from "./modules/files/service.js";
 import { configureFcm } from "./modules/notify/fcm.js";
 import { createContactsRouter } from "./modules/contacts/routes.js";
+import { createDocsRouter } from "./modules/docs/routes.js";
 import { createMeRouter } from "./modules/me/routes.js";
 import { createNotifyRouter } from "./modules/notify/routes.js";
 import { configurePush } from "./modules/notify/service.js";
@@ -87,6 +88,9 @@ export function createApp(config: Config, mailer: Mailer) {
   // /api/notifications/…
   app.use("/api", createNotifyRouter(config));
   app.use("/api/admin", createAdminRouter(config, mailer));
+
+  // Technical documentation (own access code; nginx also applies the omranisystems.com gate)
+  app.use("/documentation", createDocsRouter(config));
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Not found" });

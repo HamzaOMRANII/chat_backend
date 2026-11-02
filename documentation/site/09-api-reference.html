@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>9. API and events reference · H_CHAT documentation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
+  <span class="version">version 1.1.1</span>
+</header>
+<div class="layout">
+<nav aria-label="Chapters">
+<a href="./">Overview</a>
+<a href="01-architecture">1. Architecture</a>
+<a href="02-tech-stack">2. Technology stack</a>
+<a href="03-encryption">3. Encryption</a>
+<a href="04-chat-flows">4. How chats work</a>
+<a href="05-calls">5. How calls work</a>
+<a href="06-hosting-and-operations">6. Hosting and operations</a>
+<a href="07-limits-and-capacity">7. Limits and capacity</a>
+<a href="08-security">8. Security</a>
+<a href="09-api-reference" aria-current="page">9. API and events reference</a>
+<a href="10-ux-ui">10. UX and UI design</a>
+<a href="11-uml">11. UML models</a>
+<a href="12-data-model">12. Data model</a>
+<a href="13-developer-guide">13. Developer guide</a>
+<a href="14-operations-runbook">14. Operations runbook</a>
+<a href="15-versions">15. Versions and milestones</a>
+<form method="post" action="lock"><button type="submit">Lock the documentation</button></form>
+</nav>
+<main>
+<h1 id="9-api-and-events-reference"><a class="anchor" href="#9-api-and-events-reference">9. API and events reference</a></h1>
+<p>Base URL: <code>https://chat.omranisystems.com/api</code> (users) · <code>https://adminchat.omranisystems.com/api/admin</code> (backoffice).
+Authentication: web = <code>httpOnly</code> cookie; Android = <code>Authorization: Bearer &lt;token&gt;</code> + <code>X-Client: android</code>.
+All bodies are JSON (except file pieces: <code>application/octet-stream</code>). Errors: <code>{ error, code, details? }</code>.</p>
+<h2 id="91-rest-users"><a class="anchor" href="#91-rest-users">9.1 REST — users</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Public</td>
+<td>GET</td>
+<td><code>/health</code></td>
+<td>Liveness</td>
+</tr>
+<tr>
+<td>Public</td>
+<td>GET</td>
+<td><code>/app/config</code></td>
+<td><code>{ minAppVersion }</code> for the Android app</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>POST</td>
+<td><code>/auth/signup</code></td>
+<td>Request an account (pending approval)</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>POST</td>
+<td><code>/auth/login</code></td>
+<td>Password step → email code challenge</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>POST</td>
+<td><code>/auth/verify-code</code> · <code>/auth/verify-secure-code</code> · <code>/auth/verify-passcode</code></td>
+<td>Second step (email code, the user&#39;s secure code, or recovery passcode) → session</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>POST</td>
+<td><code>/auth/reset-credentials</code> · <code>/auth/admin-reset</code></td>
+<td>New password/passcode (after passcode or admin reset code)</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>GET</td>
+<td><code>/auth/me</code> · <code>/auth/socket-ticket</code></td>
+<td>Current user · 60-s Socket.IO ticket (web)</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>POST</td>
+<td><code>/auth/logout</code></td>
+<td>End the session</td>
+</tr>
+<tr>
+<td>Me</td>
+<td>GET</td>
+<td><code>/me/security-log</code></td>
+<td>The user&#39;s sign-in history</td>
+</tr>
+<tr>
+<td>Me</td>
+<td>POST</td>
+<td><code>/me/email</code> · <code>/me/email/verify</code></td>
+<td>Change email (code to the new address)</td>
+</tr>
+<tr>
+<td>Me</td>
+<td>GET / PUT / DELETE</td>
+<td><code>/me/secure-code</code></td>
+<td>Secure code state · set it (password + code) · remove it (password)</td>
+</tr>
+<tr>
+<td>Calls</td>
+<td>GET / PUT</td>
+<td><code>/me/calls</code></td>
+<td>&quot;Receive calls&quot; setting</td>
+</tr>
+<tr>
+<td>Calls</td>
+<td>GET</td>
+<td><code>/calls/turn</code></td>
+<td>1-hour TURN credentials</td>
+</tr>
+<tr>
+<td>Calls</td>
+<td>POST</td>
+<td><code>/calls/diag</code></td>
+<td>Call audio numbers (diagnostics)</td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td>GET</td>
+<td><code>/contacts</code> · <code>/contacts/:userId</code> · <code>/contacts/me</code></td>
+<td>List, one contact, my ID</td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td>POST</td>
+<td><code>/contacts/invite</code> · <code>/contacts/add</code> · <code>/contacts/me/new-id</code></td>
+<td>Invite code, add by code/ID, new personal ID</td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td>POST</td>
+<td><code>/contacts/requests/:id/accept</code> · <code>…/decline</code></td>
+<td>Answer a request</td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td>POST / DELETE</td>
+<td><code>/contacts/:userId/block</code> · <code>/contacts/:userId</code> · <code>/contacts/invite</code></td>
+<td>Block, remove, cancel invite</td>
+</tr>
+<tr>
+<td>Keys</td>
+<td>PUT</td>
+<td><code>/keys/identity</code></td>
+<td>Publish this device&#39;s identity public key</td>
+</tr>
+<tr>
+<td>Chats</td>
+<td>GET</td>
+<td><code>/chats</code> · <code>/chats/:id</code> · <code>/chats/options/:userId</code></td>
+<td>Open chats, one chat, allowed modes with a contact</td>
+</tr>
+<tr>
+<td>Chats</td>
+<td>POST</td>
+<td><code>/chats</code> · <code>/chats/:id/accept</code> · <code>/chats/:id/decline</code> · <code>/chats/:id/keys</code></td>
+<td>Start, accept, decline, new device key</td>
+</tr>
+<tr>
+<td>Chats</td>
+<td>DELETE</td>
+<td><code>/chats/:id</code></td>
+<td>End a chat (deletes everything)</td>
+</tr>
+<tr>
+<td>Messages</td>
+<td>GET / POST</td>
+<td><code>/chats/:id/messages</code></td>
+<td>Read (ciphertext) / send (ciphertext, optional <code>fileId</code>)</td>
+</tr>
+<tr>
+<td>Messages</td>
+<td>POST</td>
+<td><code>/chats/:id/receipts</code></td>
+<td>Delivered / read</td>
+</tr>
+<tr>
+<td>Live</td>
+<td>GET / POST</td>
+<td><code>/live</code></td>
+<td>Open live chats / invite</td>
+</tr>
+<tr>
+<td>Live</td>
+<td>POST / DELETE</td>
+<td><code>/live/:id/accept</code> · <code>/live/:id/decline</code> · <code>/live/:id</code></td>
+<td>Accept, decline, leave</td>
+</tr>
+<tr>
+<td>Files</td>
+<td>POST</td>
+<td><code>/chats/:id/files</code> · <code>/groups/:id/files</code></td>
+<td>Start an upload (kind, size)</td>
+</tr>
+<tr>
+<td>Files</td>
+<td>PUT / GET</td>
+<td><code>/files/:id/chunks/:n</code></td>
+<td>Upload / download one encrypted piece</td>
+</tr>
+<tr>
+<td>Files</td>
+<td>GET</td>
+<td><code>/chats/:id/files</code> · <code>/groups/:id/files</code> · <code>/media</code></td>
+<td>File status lists, my space and requests</td>
+</tr>
+<tr>
+<td>Files</td>
+<td>POST</td>
+<td><code>/files/delete</code></td>
+<td>Delete files (for everyone)</td>
+</tr>
+<tr>
+<td>Exports</td>
+<td>GET / POST</td>
+<td><code>/chats/:id/exports</code></td>
+<td>List / request an export</td>
+</tr>
+<tr>
+<td>Exports</td>
+<td>POST / DELETE</td>
+<td><code>/exports/:id/approve</code> · <code>…/refuse</code> · <code>…/downloaded</code> · <code>/exports/:id</code></td>
+<td>Answer, record, cancel</td>
+</tr>
+<tr>
+<td>Groups</td>
+<td>GET</td>
+<td><code>/groups</code> · <code>/groups/:id</code> · <code>/groups/:id/messages</code></td>
+<td>My groups and requests, one group, messages (only my wraps)</td>
+</tr>
+<tr>
+<td>Groups</td>
+<td>POST</td>
+<td><code>/groups/:id/keys</code> · <code>/groups/:id/messages</code> · <code>/groups/:id/read</code> · <code>/groups/:id/leave</code></td>
+<td>Key, send, read, leave</td>
+</tr>
+<tr>
+<td>Groups</td>
+<td>POST / DELETE</td>
+<td><code>/groups/requests</code> · <code>/groups/requests/:id</code></td>
+<td>Ask the admin for a group / cancel</td>
+</tr>
+<tr>
+<td>Notifications</td>
+<td>GET / PUT</td>
+<td><code>/notifications</code></td>
+<td>Preferences, Web Push key</td>
+</tr>
+<tr>
+<td>Notifications</td>
+<td>POST / DELETE</td>
+<td><code>/notifications/push</code> · <code>/notifications/fcm</code></td>
+<td>Register browser / Android push</td>
+</tr>
+<tr>
+<td>Notifications</td>
+<td>POST</td>
+<td><code>/notifications/fcm-status</code></td>
+<td>Firebase registration diagnostics</td>
+</tr>
+</tbody></table></div>
+<h2 id="92-rest-backoffice-apiadmin"><a class="anchor" href="#92-rest-backoffice-apiadmin">9.2 REST — backoffice (<code>/api/admin</code>)</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Routes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Auth</td>
+<td><code>POST /auth/login</code>, <code>POST /auth/verify-code</code>, <code>POST /auth/logout</code>, <code>GET /auth/me</code></td>
+</tr>
+<tr>
+<td>Dashboard</td>
+<td><code>GET /dashboard</code></td>
+</tr>
+<tr>
+<td>Users</td>
+<td><code>GET /users</code>, <code>GET /users/:id</code>, <code>GET /users/:id/contacts</code>, <code>POST /users/:id/approve · reject · suspend · reactivate · unlock · force-logout · reset-access</code>, <code>PUT /users/:id/categories</code>, <code>PUT /users/:id/secure-code {allowed}</code>, <code>DELETE /users/:id</code>, <code>DELETE /users/:id/chats</code></td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td><code>PUT /friendships/:id/category</code>, <code>DELETE /friendships/:id</code></td>
+</tr>
+<tr>
+<td>Categories</td>
+<td><code>GET /categories</code>, <code>POST /categories</code>, <code>POST /categories/reorder</code>, <code>GET /categories/:id/members</code>, <code>DELETE /categories/:id</code></td>
+</tr>
+<tr>
+<td>Chats</td>
+<td><code>GET /chats</code>, <code>GET /chats/:id</code>, <code>DELETE /chats/:id</code>, <code>POST /chats/purge</code></td>
+</tr>
+<tr>
+<td>Live</td>
+<td><code>GET /live</code>, <code>DELETE /live/:id</code></td>
+</tr>
+<tr>
+<td>Groups</td>
+<td><code>GET /groups</code>, <code>POST /groups</code>, <code>PUT /groups/:id</code> (edit or approve), <code>POST /groups/:id/refuse</code>, <code>DELETE /groups/:id</code></td>
+</tr>
+<tr>
+<td>Storage</td>
+<td><code>GET /storage</code>, <code>GET /storage/users/:id</code>, <code>POST /storage/users/:id/request</code>, <code>DELETE /storage/users/:id/request</code>, <code>POST /storage/delete</code>, <code>POST /storage/cleanup</code></td>
+</tr>
+<tr>
+<td>Settings</td>
+<td><code>GET /settings</code>, <code>PUT /settings</code>, <code>GET /backup</code>, <code>POST /restore</code></td>
+</tr>
+<tr>
+<td>Log</td>
+<td><code>GET /logs?action=&amp;admin=&amp;q=&amp;before=</code></td>
+</tr>
+</tbody></table></div>
+<p>Each row is one file in <code>chat_backend/src/modules/admin/</code> (<code>auth.ts</code>, <code>dashboard.ts</code>, <code>users.ts</code>, …).</p>
+<h2 id="92b-documentation-documentation-html"><a class="anchor" href="#92b-documentation-documentation-html">9.2b Documentation (<code>/documentation</code>, HTML)</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/documentation/…</code></td>
+<td>This site (static pages from <code>documentation/site</code>); without the docs cookie: the access-code page</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/documentation/unlock</code></td>
+<td>Form <code>code=</code> → 12-hour <code>hc_docs</code> cookie (path <code>/documentation</code>, httpOnly, SameSite=Strict); 8 tries / 15 min per address</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/documentation/lock</code></td>
+<td>Forget the cookie</td>
+</tr>
+</tbody></table></div>
+<h2 id="93-socketio-socketio-websocket"><a class="anchor" href="#93-socketio-socketio-websocket">9.3 Socket.IO (<code>/socket.io</code>, WebSocket)</a></h2>
+<p>Rooms: <code>user:&lt;userId&gt;</code> (all of a user&#39;s apps) and <code>session:&lt;sessionId&gt;</code>.</p>
+<p><strong>Client → server</strong></p>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Payload</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>visibility</code></td>
+<td><code>{ visible }</code></td>
+<td>App on screen or not (decides push vs banner)</td>
+</tr>
+<tr>
+<td><code>alive</code></td>
+<td>— (ack)</td>
+<td>Connection check when the app comes back on screen</td>
+</tr>
+<tr>
+<td><code>typing</code></td>
+<td><code>{ chatId }</code></td>
+<td>&quot;is typing…&quot; in a stored chat</td>
+</tr>
+<tr>
+<td><code>group:typing</code></td>
+<td><code>{ groupId }</code></td>
+<td>Typing in a group</td>
+</tr>
+<tr>
+<td><code>live</code></td>
+<td><code>{ sessionId, nonce, ct }</code></td>
+<td>Encrypted live-chat keystroke / file piece (relayed, never stored)</td>
+</tr>
+<tr>
+<td><code>call:start</code></td>
+<td><code>{ to, kind }</code> or <code>{ groupId, kind }</code> (ack)</td>
+<td>Ring a contact or a group</td>
+</tr>
+<tr>
+<td><code>call:answer</code></td>
+<td><code>{ callId }</code> (ack)</td>
+<td>Answer a 1:1 call</td>
+</tr>
+<tr>
+<td><code>call:join</code></td>
+<td><code>{ callId }</code> (ack: who is already in)</td>
+<td>Join a group call</td>
+</tr>
+<tr>
+<td><code>call:signal</code></td>
+<td><code>{ callId, to, data: { sdp+sig | candidate } }</code></td>
+<td>WebRTC signalling</td>
+</tr>
+<tr>
+<td><code>call:leave</code></td>
+<td><code>{ callId, everyone? }</code></td>
+<td>Hang up / leave / end for everyone (starter only)</td>
+</tr>
+</tbody></table></div>
+<p><strong>Server → client</strong></p>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>notify</code></td>
+<td>A notification to show (banner or phone notification)</td>
+</tr>
+<tr>
+<td><code>msg:new</code>, <code>msg:status</code>, <code>typing</code></td>
+<td>Stored chat: new message, receipts, typing</td>
+</tr>
+<tr>
+<td><code>chats:changed</code>, <code>chat:accepted</code>, <code>chat:ended</code>, <code>chat:keys</code></td>
+<td>Chat list and keys changed</td>
+</tr>
+<tr>
+<td><code>live</code>, <code>live:peer</code>, <code>live:accepted</code>, <code>live:changed</code>, <code>live:ended</code></td>
+<td>Live chat</td>
+</tr>
+<tr>
+<td><code>files:deleted</code>, <code>media:request</code>, <code>exports:changed</code></td>
+<td>Files and exports</td>
+</tr>
+<tr>
+<td><code>group:msg</code>, <code>group:read</code>, <code>group:typing</code>, <code>group:changed</code>, <code>group:call</code></td>
+<td>Groups</td>
+</tr>
+<tr>
+<td><code>call:incoming</code>, <code>call:answered</code>, <code>call:joined</code>, <code>call:left</code>, <code>call:signal</code>, <code>call:ended</code></td>
+<td>Calls</td>
+</tr>
+<tr>
+<td><code>contacts:changed</code></td>
+<td>Contacts or presence changed</td>
+</tr>
+<tr>
+<td><code>session:revoked</code></td>
+<td>This session was ended (signed in elsewhere, suspended…)</td>
+</tr>
+</tbody></table></div>
+
+<footer>
+  <span><a href="08-security">← 8. Security</a></span>
+  <span><a href="10-ux-ui">10. UX and UI design →</a></span>
+</footer>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+</main>
+</div>
+</body>
+</html>

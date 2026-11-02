@@ -47,6 +47,10 @@ const schema = z.object({
   FIREBASE_SERVICE_ACCOUNT: z.string().default("/root/.hchat/firebase-service-account.json"),
 
   MEDIA_DIR: z.string().default("/var/lib/h-chat/media"),
+  // Technical documentation at /documentation: the built site, and the argon2 hash of its access code
+  // (node -e "require('argon2').hash(process.argv[1]).then(console.log)" <code>). No hash: docs are off.
+  DOCS_DIR: z.string().default(new URL("../../documentation/site", import.meta.url).pathname),
+  DOCS_CODE_HASH: z.string().optional(),
   MOBILE_BUILDS_DIR: z.string().default("/projects/mobile_builds/h_chat"),
 });
 

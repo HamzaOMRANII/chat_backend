@@ -43,7 +43,7 @@ Old logs: `/root/.pm2/logs/h-chat-out__<date>.log` and `h-chat-error__<date>.log
 | Encrypted files | `/var/lib/h-chat/media` (`MEDIA_DIR`) |
 | APKs | `/projects/mobile_builds/h_chat` |
 | Settings and secrets | `chat_backend/.env`; index of all secrets `/root/ACCESS.txt` (never print or commit) |
-| Backups | `/projects/system_documentation/ops/omrani-backup.sh` → `/root/backups/nightly/` |
+| Backups | `/projects/backup.sh` every night at 03:00 → `/projects/backup/OS/` (encrypted, 7 kept); restore with `/projects/restore.sh` |
 
 ## Undo a bad deploy
 

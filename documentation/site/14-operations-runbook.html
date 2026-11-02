@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>14. Operations runbook · H_CHAT documentation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
+  <span class="version">version 1.1.1</span>
+</header>
+<div class="layout">
+<nav aria-label="Chapters">
+<a href="./">Overview</a>
+<a href="01-architecture">1. Architecture</a>
+<a href="02-tech-stack">2. Technology stack</a>
+<a href="03-encryption">3. Encryption</a>
+<a href="04-chat-flows">4. How chats work</a>
+<a href="05-calls">5. How calls work</a>
+<a href="06-hosting-and-operations">6. Hosting and operations</a>
+<a href="07-limits-and-capacity">7. Limits and capacity</a>
+<a href="08-security">8. Security</a>
+<a href="09-api-reference">9. API and events reference</a>
+<a href="10-ux-ui">10. UX and UI design</a>
+<a href="11-uml">11. UML models</a>
+<a href="12-data-model">12. Data model</a>
+<a href="13-developer-guide">13. Developer guide</a>
+<a href="14-operations-runbook" aria-current="page">14. Operations runbook</a>
+<a href="15-versions">15. Versions and milestones</a>
+<form method="post" action="lock"><button type="submit">Lock the documentation</button></form>
+</nav>
+<main>
+<h1 id="14-operations-runbook"><a class="anchor" href="#14-operations-runbook">14. Operations runbook</a></h1>
+<p>For whoever keeps H_CHAT running. The same content, in short, is in <code>chat_backend/docs/TROUBLESHOOTING.md</code>.</p>
+<h2 id="141-daily-weekly-checks"><a class="anchor" href="#141-daily-weekly-checks">14.1 Daily / weekly checks</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>When</th>
+<th>Check</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Daily (email digest 08:00)</td>
+<td>h-chat online, no crashes, certificates valid, disk below 80 %</td>
+<td>monitoring.omranisystems.com (digest email, <code>/apps/h-chat</code>, <code>/uptime</code>)</td>
+</tr>
+<tr>
+<td>Weekly</td>
+<td>Pending sign-up requests, group requests, storage use</td>
+<td>Backoffice: Dashboard, Users, Groups, Storage</td>
+</tr>
+<tr>
+<td>Weekly</td>
+<td>Last backup date</td>
+<td>Monitoring → Security → &quot;Last backup&quot;</td>
+</tr>
+<tr>
+<td>Monthly</td>
+<td><code>npm audit</code> in the three repositories; system updates</td>
+<td>server shell</td>
+</tr>
+</tbody></table></div>
+<h2 id="142-first-commands"><a class="anchor" href="#142-first-commands">14.2 First commands</a></h2>
+<pre><code class="language-bash">pm2 status h-chat                          # online? restarts?
+pm2 logs h-chat --lines 100                # live log (pino JSON)
+curl -s http://127.0.0.1:12000/api/health  # {&quot;status&quot;:&quot;ok&quot;,&quot;db&quot;:&quot;up&quot;}
+systemctl status mongod nginx coturn
+nginx -t
+df -h / /var/lib/h-chat
+</code></pre>
+<h2 id="143-symptom-cause-fix"><a class="anchor" href="#143-symptom-cause-fix">14.3 Symptom → cause → fix</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Site shows the omranisystems.com code page</td>
+<td>Gate cookie missing: normal</td>
+<td>Enter the chat gate code</td>
+</tr>
+<tr>
+<td><code>/documentation</code> asks for a code again</td>
+<td>Docs cookie expired (12 h) or cleared</td>
+<td>Enter the documentation access code</td>
+</tr>
+<tr>
+<td>&quot;No connection to H_CHAT&quot;</td>
+<td>Backend down, nginx or Cloudflare issue</td>
+<td><code>pm2 restart h-chat</code>; check <code>/api/health</code>, <code>nginx -t</code></td>
+</tr>
+<tr>
+<td>Sign-in emails don&#39;t arrive</td>
+<td>Gmail App Password revoked or SMTP blocked</td>
+<td>New App Password in <code>chat_backend/.env</code> (<code>EMAIL_PASSWORD</code>), restart; meanwhile users can use their secure code</td>
+</tr>
+<tr>
+<td>&quot;Too many wrong attempts&quot;</td>
+<td>5 failures in a row</td>
+<td>Backoffice → user → <strong>Unlock</strong>, or wait 30 min</td>
+</tr>
+<tr>
+<td>Secure code refused</td>
+<td>Not set, switched off, or erased by a reset</td>
+<td>Backoffice → user → secure code panel; user sets it again in Settings</td>
+</tr>
+<tr>
+<td>Messages locked / unreadable on a device</td>
+<td>Device keys changed (new phone, reinstall, cleared data)</td>
+<td>Expected: E2E. The other side&#39;s new messages work again; old ones can&#39;t be recovered</td>
+</tr>
+<tr>
+<td>Live updates stop</td>
+<td>WebSocket blocked</td>
+<td>nginx <code>/socket.io/</code> block (Upgrade headers), Cloudflare WebSockets on</td>
+</tr>
+<tr>
+<td>Calls connect but no sound / picture</td>
+<td>TURN unreachable or out of relay ports</td>
+<td><code>systemctl status coturn</code>; <code>TURN_SECRET</code> = <code>static-auth-secret</code>; widen ports 49160–49200</td>
+</tr>
+<tr>
+<td>No notifications on Android</td>
+<td>Firebase key/token</td>
+<td><code>/root/.hchat/firebase-service-account.json</code>; user re-opens the app</td>
+</tr>
+<tr>
+<td>Uploads refused</td>
+<td>100 MB/file, 2 GB/user, or disk over 80 %</td>
+<td>Backoffice → Storage (ask users to download, delete, cleanup)</td>
+</tr>
+<tr>
+<td>Phones stuck on &quot;Update required&quot;</td>
+<td>Minimum version above the published APK</td>
+<td>Backoffice → Settings → minimum version</td>
+</tr>
+<tr>
+<td>Old version still shown on the web</td>
+<td>Browser cache</td>
+<td>Ctrl+F5</td>
+</tr>
+</tbody></table></div>
+<h2 id="144-recovery"><a class="anchor" href="#144-recovery">14.4 Recovery</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Steps</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Backend crash loop</td>
+<td><code>pm2 logs h-chat --err</code>; fix or roll back (14.5); <code>pm2 restart h-chat</code></td>
+</tr>
+<tr>
+<td>MongoDB down</td>
+<td><code>systemctl restart mongod</code>; check disk space; logs <code>/var/log/mongodb/</code></td>
+</tr>
+<tr>
+<td>Server lost</td>
+<td>Rebuild a fresh Ubuntu server with <code>/projects/restore.sh</code> from the latest downloaded archive of <code>/projects/backup/OS/</code> (README there; see also <code>/projects/system_documentation/04-migration.md</code>)</td>
+</tr>
+<tr>
+<td>Suspected compromise</td>
+<td>Security chapter §8.4 incident checklist: rotate secrets, force sign-outs, raise minimum version</td>
+</tr>
+</tbody></table></div>
+<h2 id="145-undo-a-bad-release"><a class="anchor" href="#145-undo-a-bad-release">14.5 Undo a bad release</a></h2>
+<pre><code class="language-bash">cd /projects/&lt;repo&gt; &amp;&amp; git log --oneline -5      # find the last good commit
+git revert &lt;bad-commit&gt;                           # keeps history
+bash /projects/hchat-deploy.sh                    # ships again; the APK gets a new, higher version
+</code></pre>
+<p>Never re-publish an older APK version number: Android only installs a higher <code>versionCode</code>.</p>
+
+<footer>
+  <span><a href="13-developer-guide">← 13. Developer guide</a></span>
+  <span><a href="15-versions">15. Versions and milestones →</a></span>
+</footer>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+</main>
+</div>
+</body>
+</html>
