@@ -1,0 +1,14 @@
+{
+  "name": "h-chat-documentation",
+  "private": true,
+  "type": "module",
+  "description": "Builds the H_CHAT technical documentation (src/*.md) into a static site (site/), served at /documentation",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "marked": "12.0.2",
+    "mermaid": "11.4.1",
+    "playwright": "1.48.2"
+  }
+}

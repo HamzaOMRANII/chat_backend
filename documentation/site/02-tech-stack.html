@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>2. Technology stack · H_CHAT documentation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
+  <span class="version">version 1.1.1</span>
+</header>
+<div class="layout">
+<nav aria-label="Chapters">
+<a href="./">Overview</a>
+<a href="01-architecture">1. Architecture</a>
+<a href="02-tech-stack" aria-current="page">2. Technology stack</a>
+<a href="03-encryption">3. Encryption</a>
+<a href="04-chat-flows">4. How chats work</a>
+<a href="05-calls">5. How calls work</a>
+<a href="06-hosting-and-operations">6. Hosting and operations</a>
+<a href="07-limits-and-capacity">7. Limits and capacity</a>
+<a href="08-security">8. Security</a>
+<a href="09-api-reference">9. API and events reference</a>
+<a href="10-ux-ui">10. UX and UI design</a>
+<a href="11-uml">11. UML models</a>
+<a href="12-data-model">12. Data model</a>
+<a href="13-developer-guide">13. Developer guide</a>
+<a href="14-operations-runbook">14. Operations runbook</a>
+<a href="15-versions">15. Versions and milestones</a>
+<form method="post" action="lock"><button type="submit">Lock the documentation</button></form>
+</nav>
+<main>
+<h1 id="2-technology-stack"><a class="anchor" href="#2-technology-stack">2. Technology stack</a></h1>
+<h2 id="21-overview"><a class="anchor" href="#21-overview">2.1 Overview</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+<th>Version</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Server OS</td>
+<td>Ubuntu Server</td>
+<td>24.04.5 LTS</td>
+<td>Long-term support</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>Node.js</td>
+<td>24</td>
+<td>One language (TypeScript) across server and clients</td>
+</tr>
+<tr>
+<td>API</td>
+<td>Express</td>
+<td>5.3</td>
+<td>Mature, small; async error handling built in</td>
+</tr>
+<tr>
+<td>Real-time</td>
+<td>Socket.IO</td>
+<td>4.8</td>
+<td>WebSocket with automatic reconnection, rooms per user and session</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>MongoDB 8.0 + Mongoose 9</td>
+<td>8.0 / 9</td>
+<td>Flexible documents, TTL indexes for automatic expiry</td>
+</tr>
+<tr>
+<td>Validation</td>
+<td>zod</td>
+<td>4.6</td>
+<td>Every request body and query is parsed before use</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>jsonwebtoken (HS256), argon2 (Argon2id), cookie-parser</td>
+<td>9 / 0.45</td>
+<td>Sessions, password and passcode hashing</td>
+</tr>
+<tr>
+<td>Security middleware</td>
+<td>helmet, cors, express-rate-limit</td>
+<td>8 / — / 8.7</td>
+<td>Headers, origins, request limits</td>
+</tr>
+<tr>
+<td>Push</td>
+<td>web-push (VAPID), Firebase Cloud Messaging HTTP v1</td>
+<td>—</td>
+<td>Browser and Android notifications</td>
+</tr>
+<tr>
+<td>Process manager</td>
+<td>PM2</td>
+<td>—</td>
+<td>Restarts, logs (<code>pm2-logrotate</code>)</td>
+</tr>
+<tr>
+<td>Reverse proxy</td>
+<td>nginx</td>
+<td>1.24</td>
+<td>TLS, access-code gates, CSP, static files, APK downloads</td>
+</tr>
+<tr>
+<td>CDN / proxy</td>
+<td>Cloudflare</td>
+<td>—</td>
+<td>HTTPS in front of the websites, hides the origin for web traffic</td>
+</tr>
+<tr>
+<td>Call relay</td>
+<td>coturn</td>
+<td>4.6.1</td>
+<td>STUN + TURN (UDP, TCP, TLS)</td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td>React</td>
+<td>19.3</td>
+<td>UI for both web and Android</td>
+</tr>
+<tr>
+<td>Build</td>
+<td>Vite</td>
+<td>8.3</td>
+<td>Fast builds, code splitting (libsodium loaded on demand)</td>
+</tr>
+<tr>
+<td>Styling</td>
+<td>Tailwind CSS</td>
+<td>4.3</td>
+<td>Design tokens shared with the backoffice</td>
+</tr>
+<tr>
+<td>Android</td>
+<td>Capacitor</td>
+<td>8.5</td>
+<td>Same web code in a native shell + native plugins</td>
+</tr>
+<tr>
+<td>Cryptography</td>
+<td>libsodium (<code>libsodium-wrappers</code>, WebAssembly)</td>
+<td>0.7.15</td>
+<td>Audited primitives, same code on web and Android</td>
+</tr>
+<tr>
+<td>Calls</td>
+<td>WebRTC (browser / Android System WebView)</td>
+<td>—</td>
+<td>Built-in, standard, encrypted media</td>
+</tr>
+<tr>
+<td>Zip export</td>
+<td>fflate</td>
+<td>0.8.3</td>
+<td>Builds the export zip on the device</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>Vitest 5, Testing Library, Supertest, Playwright</td>
+<td>—</td>
+<td>Unit, API and real-browser scenarios</td>
+</tr>
+</tbody></table></div>
+<h2 id="22-chat-stack"><a class="anchor" href="#22-chat-stack">2.2 Chat stack</a></h2>
+<figure class="diagram"><svg aria-roledescription="flowchart-v2" role="graphics-document document" viewBox="0 0 2307.984375 227.68389892578125" style="max-width: 2307.984375px;" class="flowchart" xmlns="http://www.w3.org/2000/svg" width="100%" id="m4"><style>#m4{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}#m4 .error-icon{fill:#552222;}#m4 .error-text{fill:#552222;stroke:#552222;}#m4 .edge-thickness-normal{stroke-width:1px;}#m4 .edge-thickness-thick{stroke-width:3.5px;}#m4 .edge-pattern-solid{stroke-dasharray:0;}#m4 .edge-thickness-invisible{stroke-width:0;fill:none;}#m4 .edge-pattern-dashed{stroke-dasharray:3;}#m4 .edge-pattern-dotted{stroke-dasharray:2;}#m4 .marker{fill:#666;stroke:#666;}#m4 .marker.cross{stroke:#666;}#m4 svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#m4 p{margin:0;}#m4 .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#m4 .cluster-label text{fill:#333;}#m4 .cluster-label span{color:#333;}#m4 .cluster-label span p{background-color:transparent;}#m4 .label text,#m4 span{fill:#000000;color:#000000;}#m4 .node rect,#m4 .node circle,#m4 .node ellipse,#m4 .node polygon,#m4 .node path{fill:#eee;stroke:#999;stroke-width:1px;}#m4 .rough-node .label text,#m4 .node .label text,#m4 .image-shape .label,#m4 .icon-shape .label{text-anchor:middle;}#m4 .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#m4 .rough-node .label,#m4 .node .label,#m4 .image-shape .label,#m4 .icon-shape .label{text-align:center;}#m4 .node.clickable{cursor:pointer;}#m4 .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#m4 .arrowheadPath{fill:#333333;}#m4 .edgePath .path{stroke:#666;stroke-width:2.0px;}#m4 .flowchart-link{stroke:#666;fill:none;}#m4 .edgeLabel{background-color:white;text-align:center;}#m4 .edgeLabel p{background-color:white;}#m4 .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#m4 .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#m4 .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#m4 .cluster text{fill:#333;}#m4 .cluster span{color:#333;}#m4 div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#m4 .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#m4 rect.text{fill:none;stroke-width:0;}#m4 .icon-shape,#m4 .image-shape{background-color:white;text-align:center;}#m4 .icon-shape p,#m4 .image-shape p{background-color:white;padding:2px;}#m4 .icon-shape rect,#m4 .image-shape rect{opacity:0.5;background-color:white;fill:white;}#m4 :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker orient="auto" markerHeight="8" markerWidth="8" markerUnits="userSpaceOnUse" refY="5" refX="5" viewBox="0 0 10 10" class="marker flowchart-v2" id="m4_flowchart-v2-pointEnd"><path style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 0 0 L 10 5 L 0 10 z"></path></marker><marker orient="auto" markerHeight="8" markerWidth="8" markerUnits="userSpaceOnUse" refY="5" refX="4.5" viewBox="0 0 10 10" class="marker flowchart-v2" id="m4_flowchart-v2-pointStart"><path style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 0 5 L 10 10 L 10 0 z"></path></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5" refX="11" viewBox="0 0 10 10" class="marker flowchart-v2" id="m4_flowchart-v2-circleEnd"><circle style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" r="5" cy="5" cx="5"></circle></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5" refX="-1" viewBox="0 0 10 10" class="marker flowchart-v2" id="m4_flowchart-v2-circleStart"><circle style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" r="5" cy="5" cx="5"></circle></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5.2" refX="12" viewBox="0 0 11 11" class="marker cross flowchart-v2" id="m4_flowchart-v2-crossEnd"><path style="stroke-width: 2; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 1,1 l 9,9 M 10,1 l -9,9"></path></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5.2" refX="-1" viewBox="0 0 11 11" class="marker cross flowchart-v2" id="m4_flowchart-v2-crossStart"><path style="stroke-width: 2; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 1,1 l 9,9 M 10,1 l -9,9"></path></marker><g class="root"><g class="clusters"><g data-look="classic" id="Device" class="cluster"><rect height="172" width="1268.375" y="32.26292419433594" x="8" style=""></rect><g transform="translate(614.828125, 32.26292419433594)" class="cluster-label"><foreignObject height="24" width="54.71875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Device</p></span></div></foreignObject></g></g></g><g class="edgePaths"><path marker-end="url(#m4_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_R_S_0" d="M631.375,118.263L635.542,118.263C639.708,118.263,648.042,118.263,655.708,118.263C663.375,118.263,670.375,118.263,673.875,118.263L677.375,118.263"></path><path marker-end="url(#m4_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_S_H_1" d="M941.375,118.263L945.542,118.263C949.708,118.263,958.042,118.263,965.708,118.263C973.375,118.263,980.375,118.263,983.875,118.263L987.375,118.263"></path><path marker-end="url(#m4_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_WS_R_2" d="M217.984,118.263L238.818,118.263C259.651,118.263,301.318,118.263,342.318,118.263C383.318,118.263,423.651,118.263,443.818,118.263L463.984,118.263"></path><path marker-end="url(#m4_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_H_API_3" d="M1251.375,118.263L1255.542,118.263C1259.708,118.263,1268.042,118.263,1276.375,118.263C1284.708,118.263,1293.042,118.263,1300.708,118.263C1308.375,118.263,1315.375,118.263,1318.875,118.263L1322.375,118.263"></path><path marker-end="url(#m4_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_API_DB_4" d="M1583.015,67.263L1587.742,65.359C1592.468,63.456,1601.922,59.649,1613.711,57.745C1625.5,55.842,1639.625,55.842,1646.688,55.842L1653.75,55.842"></path><path marker-end="url(#m4_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_API_BUS_5" d="M1583.015,169.263L1587.742,171.166C1592.468,173.07,1601.922,176.877,1610.148,178.78C1618.375,180.684,1625.375,180.684,1628.875,180.684L1632.375,180.684"></path><path marker-end="url(#m4_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_BUS_IO_6" d="M1775.672,180.684L1779.839,180.684C1784.005,180.684,1792.339,180.684,1800.005,180.684C1807.672,180.684,1814.672,180.684,1818.172,180.684L1821.672,180.684"></path><path marker-end="url(#m4_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_IO_WS2_7" d="M2017.359,180.684L2021.526,180.684C2025.693,180.684,2034.026,180.684,2041.693,180.684C2049.359,180.684,2056.359,180.684,2059.859,180.684L2063.359,180.684"></path></g><g class="edgeLabels"><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g transform="translate(342.984375, 118.26292419433594)" class="edgeLabel"><g transform="translate(-100, -24)" class="label"><foreignObject height="48" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>msg:new, typing, receipts</p></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g transform="translate(549.6796875, 118.26292419433594)" id="flowchart-R-94" class="node default"><rect height="54" width="163.390625" y="-27" x="-81.6953125" style="" class="basic label-container"></rect><g transform="translate(-51.6953125, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="103.390625"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>React screen</p></span></div></foreignObject></g></g><g transform="translate(811.375, 118.26292419433594)" id="flowchart-S-95" class="node default"><rect height="102" width="260" y="-51" x="-130" style="" class="basic label-container"></rect><g transform="translate(-100, -36)" style="" class="label"><rect></rect><foreignObject height="72" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>libsodium<br>encrypt (XChaCha20-Poly1305)</p></span></div></foreignObject></g></g><g transform="translate(1121.375, 118.26292419433594)" id="flowchart-H-97" class="node default"><rect height="102" width="260" y="-51" x="-130" style="" class="basic label-container"></rect><g transform="translate(-100, -36)" style="" class="label"><rect></rect><foreignObject height="72" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>fetch() HTTPS<br>POST /api/chats/:id/messages</p></span></div></foreignObject></g></g><g transform="translate(125.4921875, 118.26292419433594)" id="flowchart-WS-98" class="node default"><rect height="54" width="184.984375" y="-27" x="-92.4921875" style="" class="basic label-container"></rect><g transform="translate(-62.4921875, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="124.984375"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Socket.IO client</p></span></div></foreignObject></g></g><g transform="translate(1456.375, 118.26292419433594)" id="flowchart-API-101" class="node default"><rect height="102" width="260" y="-51" x="-130" style="" class="basic label-container"></rect><g transform="translate(-100, -36)" style="" class="label"><rect></rect><foreignObject height="72" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Express route<br>validate (zod), check membership</p></span></div></foreignObject></g></g><g transform="translate(1706.0234375, 55.841949462890625)" id="flowchart-DB-103" class="node default"><path transform="translate(-48.2734375, -47.84194936173214)" style="" class="basic label-container" d="M0,10.894632907821427 a48.2734375,10.894632907821427 0,0,0 96.546875,0 a48.2734375,10.894632907821427 0,0,0 -96.546875,0 l0,73.89463290782143 a48.2734375,10.894632907821427 0,0,0 96.546875,0 l0,-73.89463290782143"></path><g transform="translate(-40.7734375, -14)" style="" class="label"><rect></rect><foreignObject height="48" width="81.546875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>MongoDB<br>ciphertext</p></span></div></foreignObject></g></g><g transform="translate(1706.0234375, 180.68389892578125)" id="flowchart-BUS-105" class="node default"><rect height="54" width="139.296875" y="-27" x="-69.6484375" style="" class="basic label-container"></rect><g transform="translate(-39.6484375, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="79.296875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>event bus</p></span></div></foreignObject></g></g><g transform="translate(1921.515625, 180.68389892578125)" id="flowchart-IO-106" class="node default"><rect height="78" width="191.6875" y="-39" x="-95.84375" style="" class="basic label-container"></rect><g transform="translate(-65.84375, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="131.6875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Socket.IO server<br>room user:&lt;id&gt;</p></span></div></foreignObject></g></g><g transform="translate(2183.671875, 180.68389892578125)" id="flowchart-WS2-107" class="node default"><rect height="54" width="232.625" y="-27" x="-116.3125" style="" class="basic label-container"></rect><g transform="translate(-86.3125, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="172.625"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Other device's socket</p></span></div></foreignObject></g></g></g></g></g></svg></figure>
+
+<ul>
+<li><strong>Stored messages</strong> go through HTTPS (<code>POST</code>), are saved as ciphertext, and are pushed to the recipient&#39;s open
+apps through Socket.IO (<code>msg:new</code>). Closed apps get a notification (Web Push or Firebase).</li>
+<li><strong>Live chat</strong> never touches the database: each keystroke is encrypted on the device and <strong>relayed</strong> by
+Socket.IO to the other side (<code>live</code> event).</li>
+<li><strong>Files</strong> are encrypted on the device in 4 MiB pieces and uploaded with <code>PUT /api/files/:id/chunks/:n</code>.</li>
+</ul>
+<h2 id="23-call-stack"><a class="anchor" href="#23-call-stack">2.3 Call stack</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>What it is</th>
+<th>Where it runs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>WebRTC</strong></td>
+<td>The browser&#39;s / WebView&#39;s real-time media engine</td>
+<td>On each device</td>
+</tr>
+<tr>
+<td><strong>Opus</strong></td>
+<td>Audio codec (negotiated by default; ~6–64 kbit/s, adapts to the network)</td>
+<td>On each device</td>
+</tr>
+<tr>
+<td><strong>VP8 / VP9 / H.264</strong></td>
+<td>Video codecs (negotiated automatically between the two devices)</td>
+<td>On each device</td>
+</tr>
+<tr>
+<td><strong>DTLS-SRTP</strong></td>
+<td>Mandatory WebRTC encryption of all audio and video packets</td>
+<td>Between the devices</td>
+</tr>
+<tr>
+<td><strong>ICE</strong></td>
+<td>Finds a path between two devices: direct (host/STUN) or through the relay (TURN)</td>
+<td>Devices + coturn</td>
+</tr>
+<tr>
+<td><strong>STUN</strong></td>
+<td>Tells a device its public address (<code>stun:turn.omranisystems.com:3478</code>)</td>
+<td>coturn</td>
+</tr>
+<tr>
+<td><strong>TURN</strong></td>
+<td>Relays the encrypted packets when no direct path exists (mobile data, strict Wi-Fi)</td>
+<td>coturn (UDP/TCP 3478, TLS 5349)</td>
+</tr>
+<tr>
+<td><strong>Signalling</strong></td>
+<td>Exchange of offers/answers/candidates, <strong>signed with each person&#39;s identity key</strong></td>
+<td>Socket.IO through the backend</td>
+</tr>
+<tr>
+<td><strong>Ringing</strong></td>
+<td><code>call:incoming</code> on the socket; Firebase &quot;Incoming call&quot; when the Android app is closed</td>
+<td>Backend</td>
+</tr>
+</tbody></table></div>
+<h3 id="noise-and-echo-which-service-reduces-noise-in-calls"><a class="anchor" href="#noise-and-echo-which-service-reduces-noise-in-calls">Noise and echo: which service reduces noise in calls?</a></h3>
+<p>H_CHAT uses the <strong>audio processing built into WebRTC</strong> (the WebRTC &quot;Audio Processing Module&quot;, the same one
+Google Meet and most web calling apps rely on). There is no external or cloud noise service: processing happens
+<strong>on the device</strong>, before the sound is encrypted, so no audio ever leaves the device unencrypted.</p>
+<p>The microphone is opened with:</p>
+<pre><code class="language-js">navigator.mediaDevices.getUserMedia({
+  audio: { echoCancellation: true, noiseSuppression: true },  // autoGainControl: on by default
+  video: kind === &quot;video&quot; ? { facingMode: &quot;user&quot; } : false,
+});
+</code></pre>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>What it does</th>
+<th>Provided by</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Noise suppression</strong></td>
+<td>Removes steady background noise (fans, traffic, hum) from your voice</td>
+<td>WebRTC APM (Chromium / Android System WebView)</td>
+</tr>
+<tr>
+<td><strong>Echo cancellation (AEC)</strong></td>
+<td>Removes the other person&#39;s voice that your microphone picks up from your speaker, so they don&#39;t hear themselves</td>
+<td>WebRTC APM</td>
+</tr>
+<tr>
+<td><strong>Automatic gain control (AGC)</strong></td>
+<td>Keeps your voice at a steady level whether you whisper or are close to the mic</td>
+<td>WebRTC APM (default on)</td>
+</tr>
+<tr>
+<td><strong>Opus codec</strong></td>
+<td>Built-in packet-loss concealment and bandwidth adaptation on bad networks</td>
+<td>WebRTC</td>
+</tr>
+<tr>
+<td><strong>Android call mode</strong></td>
+<td><code>AudioManager.MODE_IN_COMMUNICATION</code>: the phone&#39;s voice-call audio path (and its hardware echo/noise processing where the phone has it)</td>
+<td><code>CallAudioPlugin</code> (native)</td>
+</tr>
+</tbody></table></div>
+<p>On Android the sound goes, in this order, to: a connected headset or earbuds → the phone&#39;s earpiece → the
+loudspeaker (only when the user taps it). The screen turns off at the ear (proximity sensor), and a foreground
+service (<code>CallService</code>) keeps the microphone running with the screen off.</p>
+<h2 id="24-notifications-stack"><a class="anchor" href="#24-notifications-stack">2.4 Notifications stack</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Channel</th>
+<th>What the provider sees</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>App open on screen</td>
+<td>Socket.IO <code>notify</code> event → in-app banner</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Android app in background or closed</td>
+<td>Firebase Cloud Messaging (HTTP v1, service account)</td>
+<td>&quot;H_CHAT · New message&quot;, &quot;Incoming call&quot;… never names or content</td>
+</tr>
+<tr>
+<td>Browser tab closed</td>
+<td>Web Push (VAPID keys) via the browser&#39;s push service</td>
+<td>Nothing readable: the payload (sender name + &quot;New message&quot;, never content) is encrypted for that browser (RFC 8291)</td>
+</tr>
+</tbody></table></div>
+<h2 id="25-android-native-pieces"><a class="anchor" href="#25-android-native-pieces">2.5 Android native pieces</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Plugin / service</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@capacitor/push-notifications</code></td>
+<td>Firebase registration, notification taps</td>
+</tr>
+<tr>
+<td><code>@capacitor/local-notifications</code></td>
+<td>Phone notifications while the app runs in the background</td>
+</tr>
+<tr>
+<td><code>@capacitor/filesystem</code>, <code>@capacitor/share</code></td>
+<td>Save to Documents/H_CHAT, share files</td>
+</tr>
+<tr>
+<td><code>SecureScreenPlugin</code></td>
+<td><code>FLAG_SECURE</code>: no screenshots while a view-only file is shown</td>
+</tr>
+<tr>
+<td><code>CallAudioPlugin</code></td>
+<td>Call audio mode, output choice (earpiece / speaker / headset), proximity screen-off</td>
+</tr>
+<tr>
+<td><code>CallService</code></td>
+<td>Foreground service &quot;call in progress&quot; (microphone/camera with screen off)</td>
+</tr>
+<tr>
+<td><code>FoldersPlugin</code></td>
+<td>Opens Documents/H_CHAT in the Files app</td>
+</tr>
+</tbody></table></div>
+
+<footer>
+  <span><a href="01-architecture">← 1. Architecture</a></span>
+  <span><a href="03-encryption">3. Encryption →</a></span>
+</footer>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+</main>
+</div>
+</body>
+</html>

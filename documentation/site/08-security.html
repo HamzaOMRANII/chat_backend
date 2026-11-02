@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>8. Security · H_CHAT documentation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
+  <span class="version">version 1.1.1</span>
+</header>
+<div class="layout">
+<nav aria-label="Chapters">
+<a href="./">Overview</a>
+<a href="01-architecture">1. Architecture</a>
+<a href="02-tech-stack">2. Technology stack</a>
+<a href="03-encryption">3. Encryption</a>
+<a href="04-chat-flows">4. How chats work</a>
+<a href="05-calls">5. How calls work</a>
+<a href="06-hosting-and-operations">6. Hosting and operations</a>
+<a href="07-limits-and-capacity">7. Limits and capacity</a>
+<a href="08-security" aria-current="page">8. Security</a>
+<a href="09-api-reference">9. API and events reference</a>
+<a href="10-ux-ui">10. UX and UI design</a>
+<a href="11-uml">11. UML models</a>
+<a href="12-data-model">12. Data model</a>
+<a href="13-developer-guide">13. Developer guide</a>
+<a href="14-operations-runbook">14. Operations runbook</a>
+<a href="15-versions">15. Versions and milestones</a>
+<form method="post" action="lock"><button type="submit">Lock the documentation</button></form>
+</nav>
+<main>
+<h1 id="8-security"><a class="anchor" href="#8-security">8. Security</a></h1>
+<p>This document summarises the security design, the controls in place and the remaining risks. The full release
+review is in <code>chat_backend/docs/SECURITY_REVIEW.md</code>.</p>
+<h2 id="81-threat-model"><a class="anchor" href="#81-threat-model">8.1 Threat model</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Adversary</th>
+<th>Can they read messages, files or calls?</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Someone listening on the network (Wi-Fi, ISP)</td>
+<td><strong>No</strong></td>
+<td>TLS for web traffic, DTLS-SRTP for calls, plus end-to-end encryption</td>
+</tr>
+<tr>
+<td>Cloudflare</td>
+<td><strong>No</strong></td>
+<td>Sees HTTPS traffic in clear at its edge, but the content is already end-to-end encrypted</td>
+</tr>
+<tr>
+<td>Google (Firebase) / browser push services</td>
+<td><strong>No</strong></td>
+<td>Generic texts / payloads encrypted for the browser</td>
+</tr>
+<tr>
+<td>Someone who steals the database or disk</td>
+<td><strong>No</strong> for content</td>
+<td>Ciphertext only; passwords Argon2id-hashed. Metadata <strong>yes</strong></td>
+</tr>
+<tr>
+<td>The administrator</td>
+<td><strong>No</strong> for content</td>
+<td>The backoffice shows metadata only; can delete, not read</td>
+</tr>
+<tr>
+<td>A malicious or compromised server</td>
+<td><strong>Not passively.</strong> Could try to swap keys (detected by signatures and the safety code), or serve modified web-app code (Android app not affected)</td>
+<td></td>
+</tr>
+<tr>
+<td>Malware on a user&#39;s device</td>
+<td><strong>Yes</strong></td>
+<td>Endpoint compromise defeats any messenger&#39;s encryption</td>
+</tr>
+<tr>
+<td>Another user</td>
+<td>Only what&#39;s sent to them</td>
+<td>Contacts must share a category; blocking; view-only files</td>
+</tr>
+</tbody></table></div>
+<figure class="diagram"><svg aria-roledescription="flowchart-v2" role="graphics-document document" viewBox="0 0 1833.28125 169" style="max-width: 1833.28125px;" class="flowchart" xmlns="http://www.w3.org/2000/svg" width="100%" id="m23"><style>#m23{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}#m23 .error-icon{fill:#552222;}#m23 .error-text{fill:#552222;stroke:#552222;}#m23 .edge-thickness-normal{stroke-width:1px;}#m23 .edge-thickness-thick{stroke-width:3.5px;}#m23 .edge-pattern-solid{stroke-dasharray:0;}#m23 .edge-thickness-invisible{stroke-width:0;fill:none;}#m23 .edge-pattern-dashed{stroke-dasharray:3;}#m23 .edge-pattern-dotted{stroke-dasharray:2;}#m23 .marker{fill:#666;stroke:#666;}#m23 .marker.cross{stroke:#666;}#m23 svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#m23 p{margin:0;}#m23 .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#m23 .cluster-label text{fill:#333;}#m23 .cluster-label span{color:#333;}#m23 .cluster-label span p{background-color:transparent;}#m23 .label text,#m23 span{fill:#000000;color:#000000;}#m23 .node rect,#m23 .node circle,#m23 .node ellipse,#m23 .node polygon,#m23 .node path{fill:#eee;stroke:#999;stroke-width:1px;}#m23 .rough-node .label text,#m23 .node .label text,#m23 .image-shape .label,#m23 .icon-shape .label{text-anchor:middle;}#m23 .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#m23 .rough-node .label,#m23 .node .label,#m23 .image-shape .label,#m23 .icon-shape .label{text-align:center;}#m23 .node.clickable{cursor:pointer;}#m23 .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#m23 .arrowheadPath{fill:#333333;}#m23 .edgePath .path{stroke:#666;stroke-width:2.0px;}#m23 .flowchart-link{stroke:#666;fill:none;}#m23 .edgeLabel{background-color:white;text-align:center;}#m23 .edgeLabel p{background-color:white;}#m23 .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#m23 .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#m23 .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#m23 .cluster text{fill:#333;}#m23 .cluster span{color:#333;}#m23 div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#m23 .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#m23 rect.text{fill:none;stroke-width:0;}#m23 .icon-shape,#m23 .image-shape{background-color:white;text-align:center;}#m23 .icon-shape p,#m23 .image-shape p{background-color:white;padding:2px;}#m23 .icon-shape rect,#m23 .image-shape rect{opacity:0.5;background-color:white;fill:white;}#m23 :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker orient="auto" markerHeight="8" markerWidth="8" markerUnits="userSpaceOnUse" refY="5" refX="5" viewBox="0 0 10 10" class="marker flowchart-v2" id="m23_flowchart-v2-pointEnd"><path style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 0 0 L 10 5 L 0 10 z"></path></marker><marker orient="auto" markerHeight="8" markerWidth="8" markerUnits="userSpaceOnUse" refY="5" refX="4.5" viewBox="0 0 10 10" class="marker flowchart-v2" id="m23_flowchart-v2-pointStart"><path style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 0 5 L 10 10 L 10 0 z"></path></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5" refX="11" viewBox="0 0 10 10" class="marker flowchart-v2" id="m23_flowchart-v2-circleEnd"><circle style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" r="5" cy="5" cx="5"></circle></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5" refX="-1" viewBox="0 0 10 10" class="marker flowchart-v2" id="m23_flowchart-v2-circleStart"><circle style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" r="5" cy="5" cx="5"></circle></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5.2" refX="12" viewBox="0 0 11 11" class="marker cross flowchart-v2" id="m23_flowchart-v2-crossEnd"><path style="stroke-width: 2; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 1,1 l 9,9 M 10,1 l -9,9"></path></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5.2" refX="-1" viewBox="0 0 11 11" class="marker cross flowchart-v2" id="m23_flowchart-v2-crossStart"><path style="stroke-width: 2; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 1,1 l 9,9 M 10,1 l -9,9"></path></marker><g class="root"><g class="clusters"></g><g class="edgePaths"><path marker-end="url(#m23_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_Trusted_Untrusted_0" d="M451.344,84.5L472.177,84.5C493.01,84.5,534.677,84.5,575.677,84.5C616.677,84.5,657.01,84.5,677.177,84.5L697.344,84.5"></path></g><g class="edgeLabels"><g transform="translate(576.34375, 84.5)" class="edgeLabel"><g transform="translate(-100, -24)" class="label"><foreignObject height="48" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>ciphertext · public keys · metadata</p></span></div></foreignObject></g></g></g><g class="nodes"><g transform="translate(693.34375, 0)" class="root"><g class="clusters"><g data-look="classic" id="Untrusted" class="cluster"><rect height="153" width="1123.9375" y="8" x="8" style=""></rect><g transform="translate(471.921875, 8)" class="cluster-label"><foreignObject height="24" width="196.09375"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Not trusted with content</p></span></div></foreignObject></g></g></g><g class="edgePaths"></g><g class="edgeLabels"></g><g class="nodes"><g transform="translate(109.65625, 84.5)" id="flowchart-NET-207" class="node default"><rect height="54" width="133.3125" y="-27" x="-66.65625" style="" class="basic label-container"></rect><g transform="translate(-36.65625, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="73.3125"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>networks</p></span></div></foreignObject></g></g><g transform="translate(297.140625, 84.5)" id="flowchart-CFL-208" class="node default"><rect height="54" width="141.65625" y="-27" x="-70.828125" style="" class="basic label-container"></rect><g transform="translate(-40.828125, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="81.65625"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Cloudflare</p></span></div></foreignObject></g></g><g transform="translate(547.96875, 84.5)" id="flowchart-SRV-209" class="node default"><rect height="78" width="260" y="-39" x="-130" style="" class="basic label-container"></rect><g transform="translate(-100, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>H_CHAT server + database + disk</p></span></div></foreignObject></g></g><g transform="translate(812.7265625, 84.5)" id="flowchart-PUSH-210" class="node default"><rect height="54" width="169.515625" y="-27" x="-84.7578125" style="" class="basic label-container"></rect><g transform="translate(-54.7578125, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="109.515625"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>push services</p></span></div></foreignObject></g></g><g transform="translate(1022.2109375, 84.5)" id="flowchart-TURN-211" class="node default"><rect height="54" width="149.453125" y="-27" x="-74.7265625" style="" class="basic label-container"></rect><g transform="translate(-44.7265625, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="89.453125"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>TURN relay</p></span></div></foreignObject></g></g></g></g><g transform="translate(0, 12)" class="root"><g class="clusters"><g data-look="classic" id="Trusted" class="cluster"><rect height="129" width="443.34375" y="8" x="8" style=""></rect><g transform="translate(129.671875, 8)" class="cluster-label"><foreignObject height="72" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Trusted: the user's device + the H_CHAT app</p></span></div></foreignObject></g></g></g><g class="edgePaths"></g><g class="edgeLabels"></g><g class="nodes"><g transform="translate(122, 72.5)" id="flowchart-K-205" class="node default"><rect height="54" width="158" y="-27" x="-79" style="" class="basic label-container"></rect><g transform="translate(-49, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="98"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>private keys</p></span></div></foreignObject></g></g><g transform="translate(333.671875, 72.5)" id="flowchart-P-206" class="node default"><rect height="54" width="165.34375" y="-27" x="-82.671875" style="" class="basic label-container"></rect><g transform="translate(-52.671875, -12)" style="" class="label"><rect></rect><foreignObject height="24" width="105.34375"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>plain content</p></span></div></foreignObject></g></g></g></g></g></g></g></svg></figure>
+
+<h2 id="82-controls-in-place"><a class="anchor" href="#82-controls-in-place">8.2 Controls in place</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Control</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Accounts</td>
+<td>Admin approval; Argon2id for passwords and recovery passcodes; email code (6 digits, 5 min, 5 attempts) or the user&#39;s own secure code (Argon2id, alert email on each use, admin switch); 30-min lock after repeated failures; one session per account; security log visible to the user</td>
+</tr>
+<tr>
+<td>Sessions</td>
+<td>JWT HS256 with pinned algorithm; separate user/admin secrets; user 30 days, admin 2 h; web cookie <code>httpOnly; Secure; SameSite=Strict</code>; socket tickets 60 s</td>
+</tr>
+<tr>
+<td>Access control</td>
+<td>Every admin route requires an admin session; user routes check membership (chat, group, file)</td>
+</tr>
+<tr>
+<td>Input</td>
+<td>zod validation on every body and query; 64 KB JSON limit; exact-size file pieces</td>
+</tr>
+<tr>
+<td>Transport</td>
+<td>HTTPS everywhere (Cloudflare + Let&#39;s Encrypt), WSS, TURN over TLS available</td>
+</tr>
+<tr>
+<td>Content</td>
+<td>End-to-end encryption (Encryption doc); signed keys; safety codes; signed call offers</td>
+</tr>
+<tr>
+<td>Web app</td>
+<td>CSP <code>script-src &#39;self&#39; &#39;wasm-unsafe-eval&#39;</code>, no third-party scripts, <code>frame-ancestors &#39;none&#39;</code>, nosniff</td>
+</tr>
+<tr>
+<td>Server</td>
+<td>Backend and MongoDB on 127.0.0.1; MongoDB auth; web ports open to Cloudflare only; access-code gates in front of both sites</td>
+</tr>
+<tr>
+<td>Abuse</td>
+<td>Per-session/per-address rate limits; sign-in/sign-up limits; socket flood guard; ID search limit</td>
+</tr>
+<tr>
+<td>Files</td>
+<td>Paths only from validated ids; 2 GB quota; disk guard; automatic expiry</td>
+</tr>
+<tr>
+<td>TURN</td>
+<td>Short-lived HMAC credentials; private/loopback/multicast destinations denied; TLS 1.0/1.1 disabled</td>
+</tr>
+<tr>
+<td>View-only</td>
+<td>Android blocks screenshots/recording (<code>FLAG_SECURE</code>); web deters (no right-click/drag/print, blur when unfocused)</td>
+</tr>
+<tr>
+<td>Updates</td>
+<td>&quot;Update available&quot; card; administrator-set minimum version blocks old apps</td>
+</tr>
+<tr>
+<td>Dependencies</td>
+<td><code>npm audit</code>: 0 known vulnerabilities at 1.0.0</td>
+</tr>
+<tr>
+<td>Audit</td>
+<td>Every admin action logged (90 days), filterable</td>
+</tr>
+</tbody></table></div>
+<h2 id="83-risks-and-recommendations"><a class="anchor" href="#83-risks-and-recommendations">8.3 Risks and recommendations</a></h2>
+<p>Ranked by importance (likelihood × impact).</p>
+<div class="table"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Risk</th>
+<th>Impact</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>R1</strong></td>
+<td><strong>Backups are nightly but stay on the same server</strong> (<code>/projects/backup.sh</code>, 03:00, encrypted, 7 kept); copies off the server are manual downloads</td>
+<td>If the VPS is lost, data since the last downloaded copy is lost</td>
+<td>Download the latest archive regularly; test a full restore with <code>/projects/restore.sh</code> on a VM</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><strong>Single server</strong> for everything (web, API, DB, TURN, other apps)</td>
+<td>Outage = H_CHAT down; one compromised app on the server could affect others</td>
+<td>Separate VPS for H_CHAT (and TURN); provider snapshots</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><strong>RDP (3389) open to the internet</strong> (owner&#39;s choice). SSH is key-only with fail2ban since 2026-10-29; 3010/11000 only redirect</td>
+<td>Brute-force / exploit entry to the whole server through RDP</td>
+<td>Restrict RDP to your IP or a VPN (WireGuard) when possible</td>
+</tr>
+<tr>
+<td><strong>R4</strong></td>
+<td>Private keys in app storage (<code>localStorage</code> / WebView), not a hardware keystore</td>
+<td>Malware or an XSS bug could read keys</td>
+<td>Keep strict CSP; consider Android Keystore-wrapped keys; WebCrypto non-extractable keys on web</td>
+</tr>
+<tr>
+<td><strong>R5</strong></td>
+<td>Web app code is served by the server</td>
+<td>A compromised server could ship modified JavaScript to web users</td>
+<td>Recommend the Android app for sensitive use; Subresource Integrity / signed releases; monitor <code>dist</code> integrity</td>
+</tr>
+<tr>
+<td><strong>R6</strong></td>
+<td>Metadata visible to the server (who/when/sizes/IPs)</td>
+<td>Social graph exposure if the DB leaks</td>
+<td>Minimise retention of logs; consider sealed-sender-style designs later</td>
+</tr>
+<tr>
+<td><strong>R7</strong></td>
+<td>No forward secrecy per message (no Double Ratchet)</td>
+<td>A stolen device key reveals that chat&#39;s still-stored messages</td>
+<td>Short retention already limits it; a ratchet (e.g. Signal protocol / MLS for groups) for v2</td>
+</tr>
+<tr>
+<td><strong>R8</strong></td>
+<td>Secrets in plain files (<code>.env</code>, <code>/root/ACCESS.txt</code>, Firebase key)</td>
+<td>Server compromise exposes them</td>
+<td>Keep <code>chmod 600</code>; move to a secrets manager; rotate after any incident</td>
+</tr>
+<tr>
+<td><strong>R9</strong></td>
+<td>TURN relay port range small (41 ports)</td>
+<td>Calls fail to connect at peak (availability, not confidentiality)</td>
+<td>Widen the range (Limits §7.4)</td>
+</tr>
+<tr>
+<td><strong>R10</strong></td>
+<td>Firebase metadata</td>
+<td>Google learns that (and when) a phone got a notification</td>
+<td>Generic texts already; a self-hosted push alternative (UnifiedPush) if needed</td>
+</tr>
+<tr>
+<td><strong>R11</strong></td>
+<td>Gate codes are shared access codes</td>
+<td>Leaked code removes one layer (accounts and E2E remain)</td>
+<td>Rotate gate codes periodically</td>
+</tr>
+<tr>
+<td><strong>R12</strong></td>
+<td>One-time database password exposure in a session log (18 Oct)</td>
+<td>Low (stayed on the server)</td>
+<td>Rotate the H_CHAT MongoDB password</td>
+</tr>
+<tr>
+<td><strong>R13</strong></td>
+<td>Secure code = password <strong>and</strong> code are both things the user knows (no email possession)</td>
+<td>Someone who learns both can sign in without the mailbox</td>
+<td>Alert email on every use; lock after 5 failures; erased by any reset; admin switch per user; users choose a code different from the passcode</td>
+</tr>
+</tbody></table></div>
+<h2 id="84-incident-checklist"><a class="anchor" href="#84-incident-checklist">8.4 Incident checklist</a></h2>
+<ol>
+<li><strong>Suspected account compromise:</strong> backoffice › Users › <em>Force sign-out</em> / <em>Suspend</em>; the user changes
+password; their security log shows devices and places.</li>
+<li><strong>Server compromise:</strong> rotate <code>JWT_SECRET</code>, <code>ADMIN_JWT_SECRET</code> (signs everyone out), <code>TURN_SECRET</code>, VAPID keys,
+Firebase key (console › service accounts), MongoDB password, gate codes; reinstall from GitHub <code>v1.0.0</code>;
+raise the <strong>minimum app version</strong> after a fixed release. Also change the documentation access code
+(<code>DOCS_CODE_HASH</code> in <code>.env</code>) and the gate codes.</li>
+<li><strong>Lost phone:</strong> the user signs in elsewhere (the old session ends); their old device&#39;s keys are useless without
+the session; ending sensitive chats destroys their keys everywhere.</li>
+<li><strong>Disk filling up:</strong> backoffice › Storage › <em>Clean up now</em>, <em>Ask to download</em>, or delete media; uploads stop at 80%.</li>
+</ol>
+
+<footer>
+  <span><a href="07-limits-and-capacity">← 7. Limits and capacity</a></span>
+  <span><a href="09-api-reference">9. API and events reference →</a></span>
+</footer>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+</main>
+</div>
+</body>
+</html>

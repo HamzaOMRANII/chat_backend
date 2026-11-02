@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>15. Versions and milestones · H_CHAT documentation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
+  <span class="version">version 1.1.1</span>
+</header>
+<div class="layout">
+<nav aria-label="Chapters">
+<a href="./">Overview</a>
+<a href="01-architecture">1. Architecture</a>
+<a href="02-tech-stack">2. Technology stack</a>
+<a href="03-encryption">3. Encryption</a>
+<a href="04-chat-flows">4. How chats work</a>
+<a href="05-calls">5. How calls work</a>
+<a href="06-hosting-and-operations">6. Hosting and operations</a>
+<a href="07-limits-and-capacity">7. Limits and capacity</a>
+<a href="08-security">8. Security</a>
+<a href="09-api-reference">9. API and events reference</a>
+<a href="10-ux-ui">10. UX and UI design</a>
+<a href="11-uml">11. UML models</a>
+<a href="12-data-model">12. Data model</a>
+<a href="13-developer-guide">13. Developer guide</a>
+<a href="14-operations-runbook">14. Operations runbook</a>
+<a href="15-versions" aria-current="page">15. Versions and milestones</a>
+<form method="post" action="lock"><button type="submit">Lock the documentation</button></form>
+</nav>
+<main>
+<h1 id="15-versions-and-milestones"><a class="anchor" href="#15-versions-and-milestones">15. Versions and milestones</a></h1>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Milestone</th>
+<th>What it added</th>
+<th>Release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M0</td>
+<td>Foundations: three repositories, gates, deploy</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td>M1</td>
+<td>Accounts: sign-up with admin approval, password + email code, recovery passcode, one session per account</td>
+<td>0.2</td>
+</tr>
+<tr>
+<td>M2</td>
+<td>Contacts: personal ID, invite codes, categories with rules, block / remove</td>
+<td>0.3</td>
+</tr>
+<tr>
+<td>M3</td>
+<td>Stored chats (Keep-alive 30 min–7 days, Automatic 7 days), end-to-end encryption, safety codes, receipts, notifications</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td>M4</td>
+<td>Live chats: letter by letter, nothing stored</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>M5</td>
+<td>Encrypted files (100 MB/file, 2 GB/user), media screens, view-only, admin storage</td>
+<td>0.6</td>
+</tr>
+<tr>
+<td>M6</td>
+<td>Export with the other side&#39;s approval (zip built on the device)</td>
+<td>0.7</td>
+</tr>
+<tr>
+<td>M7</td>
+<td>Voice and video calls (WebRTC, TURN relay, signed offers), ringing when the app is closed, update prompt</td>
+<td>0.8</td>
+</tr>
+<tr>
+<td>M8</td>
+<td>Groups (max 10) and group calls (max 6)</td>
+<td>0.9</td>
+</tr>
+<tr>
+<td>M9</td>
+<td>Security review, rate limits, flood guard, minimum app version, settings backup / restore</td>
+<td><strong>1.0.0</strong> (2026-10-18)</td>
+</tr>
+<tr>
+<td>M11</td>
+<td>Secure code: per-user code instead of the email code (hidden field, alert email, admin switch)</td>
+<td><strong>1.1.0</strong> (2026-10-30)</td>
+</tr>
+<tr>
+<td>M10</td>
+<td>Maintainability: code checker and formatter (Biome), <code>npm run check</code>, backoffice API split per section, developer guides, troubleshooting guide, reliable tests; backoffice user <em>Chats</em> tab fixed</td>
+<td><strong>1.1.1</strong> (2026-10-30)</td>
+</tr>
+<tr>
+<td>M12</td>
+<td>This documentation site at <code>/documentation</code>, behind the gate and its own access code</td>
+<td>backend only</td>
+</tr>
+</tbody></table></div>
+<p>Every release is tagged in <code>chat_app</code> (<code>v1.0.0</code>, <code>v1.1.0</code>, <code>v1.1.1</code>); APKs are kept in
+<code>/projects/mobile_builds/h_chat/</code>.</p>
+<h2 id="open-ideas"><a class="anchor" href="#open-ideas">Open ideas</a></h2>
+<ul>
+<li>Full-screen ringing over the lock screen (Android full-screen intent).</li>
+<li>Reading view-only PDFs inside the app.</li>
+<li>Accessibility follow-ups listed by <code>npm run lint</code> (keyboard equivalents for sheet backdrops, SVG titles).</li>
+<li>Forward secrecy per message (a ratchet) for a 2.0.</li>
+</ul>
+
+<footer>
+  <span><a href="14-operations-runbook">← 14. Operations runbook</a></span>
+  <span></span>
+</footer>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+</main>
+</div>
+</body>
+</html>

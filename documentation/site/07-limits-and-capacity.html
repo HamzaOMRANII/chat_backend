@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>7. Limits and capacity · H_CHAT documentation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
+  <span class="version">version 1.1.1</span>
+</header>
+<div class="layout">
+<nav aria-label="Chapters">
+<a href="./">Overview</a>
+<a href="01-architecture">1. Architecture</a>
+<a href="02-tech-stack">2. Technology stack</a>
+<a href="03-encryption">3. Encryption</a>
+<a href="04-chat-flows">4. How chats work</a>
+<a href="05-calls">5. How calls work</a>
+<a href="06-hosting-and-operations">6. Hosting and operations</a>
+<a href="07-limits-and-capacity" aria-current="page">7. Limits and capacity</a>
+<a href="08-security">8. Security</a>
+<a href="09-api-reference">9. API and events reference</a>
+<a href="10-ux-ui">10. UX and UI design</a>
+<a href="11-uml">11. UML models</a>
+<a href="12-data-model">12. Data model</a>
+<a href="13-developer-guide">13. Developer guide</a>
+<a href="14-operations-runbook">14. Operations runbook</a>
+<a href="15-versions">15. Versions and milestones</a>
+<form method="post" action="lock"><button type="submit">Lock the documentation</button></form>
+</nav>
+<main>
+<h1 id="7-limits-and-capacity"><a class="anchor" href="#7-limits-and-capacity">7. Limits and capacity</a></h1>
+<h2 id="71-product-limits-by-design"><a class="anchor" href="#71-product-limits-by-design">7.1 Product limits (by design)</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Accounts</td>
+<td>Sign-up needs administrator approval; <strong>one active session per account</strong> (signing in elsewhere signs out the previous device)</td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td>Only people sharing a category; ID searches: 10 per hour; invite codes valid 24 h, one use</td>
+</tr>
+<tr>
+<td>Stored messages</td>
+<td>Up to 4,000 characters; kept 30 min to <strong>7 days</strong> (category maximum), then deleted</td>
+</tr>
+<tr>
+<td>Chat invitations</td>
+<td>Expire after 24 h</td>
+</tr>
+<tr>
+<td>Live chats</td>
+<td>Invitation 5 min; wiped when either leaves or after <strong>60 s</strong> without connection; one live chat per pair</td>
+</tr>
+<tr>
+<td>Files</td>
+<td><strong>100 MB per file</strong>, <strong>2 GB per user</strong> (files they sent and still on the server), deleted with their message</td>
+</tr>
+<tr>
+<td>Server disk guard</td>
+<td>New uploads refused above <strong>80%</strong> disk use (messages and calls keep working)</td>
+</tr>
+<tr>
+<td>Photo previews</td>
+<td>Automatic up to 10 MB, tap to download above</td>
+</tr>
+<tr>
+<td>Export</td>
+<td>Needs the other person&#39;s approval; 24 h to save; view-only files of the other side never included; not in groups</td>
+</tr>
+<tr>
+<td>Groups</td>
+<td><strong>10 members</strong> maximum; created by the admin or requested by a user (admin approval)</td>
+</tr>
+<tr>
+<td>Group calls</td>
+<td><strong>6 people</strong> at once (mesh)</td>
+</tr>
+<tr>
+<td>Calls</td>
+<td>Ring 45 s; end after 15 s without media connection; voice and video in every category</td>
+</tr>
+<tr>
+<td>Request limits</td>
+<td>600 requests/min per signed-in session; 120/min per address when not signed in; sign-in 30 per 15 min; sign-up 5 per hour</td>
+</tr>
+<tr>
+<td>Real-time events</td>
+<td>~200 per second per connection (flood guard)</td>
+</tr>
+<tr>
+<td>Logs</td>
+<td>Admin and security logs kept 90 days</td>
+</tr>
+</tbody></table></div>
+<h2 id="72-platform-limits"><a class="anchor" href="#72-platform-limits">7.2 Platform limits</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Android only for the native app</td>
+<td>No iOS app. iPhones can open the web app in a browser, but this was <strong>never tested</strong>; screenshot blocking and lock-screen call ringing are Android-only</td>
+</tr>
+<tr>
+<td>Android app fully closed</td>
+<td>Notifications and calls arrive through Firebase; the call rings as a high-priority notification, <strong>not</strong> a full-screen lock-screen ring</td>
+</tr>
+<tr>
+<td>Screenshots of view-only files</td>
+<td>Blocked on Android (<code>FLAG_SECURE</code>); a browser can only deter (no right-click, blur when unfocused)</td>
+</tr>
+<tr>
+<td>View-only documents</td>
+<td>Photos, videos and text can be viewed in the app; PDF/Office view-only files can&#39;t be opened inside the app yet</td>
+</tr>
+<tr>
+<td>One device at a time</td>
+<td>One active session per account: phone <strong>or</strong> computer, not both at once</td>
+</tr>
+<tr>
+<td>Key storage</td>
+<td>Private keys are in app storage, not a hardware keystore (see Security)</td>
+</tr>
+<tr>
+<td>Single server</td>
+<td>No high availability: if the VPS is down, H_CHAT is down</td>
+</tr>
+</tbody></table></div>
+<h2 id="73-how-many-calls-can-run-at-the-same-time"><a class="anchor" href="#73-how-many-calls-can-run-at-the-same-time">7.3 How many calls can run at the same time?</a></h2>
+<p>Three different resources limit calls. The tightest one wins.</p>
+<h3 id="a-signalling-backend-socketio-not-the-bottleneck"><a class="anchor" href="#a-signalling-backend-socketio-not-the-bottleneck">A. Signalling (backend + Socket.IO) — not the bottleneck</a></h3>
+<p>Ringing and offers/answers are a few small messages per call. A single Node.js process handles <strong>thousands</strong> of
+connected users and hundreds of simultaneous call set-ups.</p>
+<h3 id="b-direct-peer-to-peer-calls-no-server-limit"><a class="anchor" href="#b-direct-peer-to-peer-calls-no-server-limit">B. Direct (peer-to-peer) calls — no server limit</a></h3>
+<p>When the two devices connect directly, audio/video <strong>never touches the server</strong>. Their number isn&#39;t limited by
+the server at all; only by the users&#39; own connections.</p>
+<h3 id="c-relayed-calls-through-coturn-the-real-limit-today"><a class="anchor" href="#c-relayed-calls-through-coturn-the-real-limit-today">C. Relayed calls (through coturn) — <strong>the real limit today</strong></a></h3>
+<p>Each device that can&#39;t connect directly uses one <strong>TURN allocation</strong>, and each allocation needs <strong>one relay port</strong>.
+coturn is configured with relay ports <strong>49160–49200 = 41 ports</strong> (<code>total-quota=100</code>, <code>user-quota=12</code>).</p>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Call type</th>
+<th>Relay ports used</th>
+<th>Maximum at the same time (41 ports)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1:1, only one side behind a strict network</td>
+<td>1</td>
+<td>~<strong>40</strong></td>
+</tr>
+<tr>
+<td>1:1, both sides relayed</td>
+<td>2</td>
+<td>~<strong>20</strong></td>
+</tr>
+<tr>
+<td>Group call of 6, all relayed (mesh: 5 links each)</td>
+<td>up to 30</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>Group call of 4, all relayed</td>
+<td>up to 12</td>
+<td>~3</td>
+</tr>
+</tbody></table></div>
+<p>While connecting, a device may briefly open extra allocations (UDP, TCP and TLS are all tried), so the practical
+numbers can be lower at peak moments.</p>
+<p><strong>Bandwidth through the relay</strong> (each relayed stream enters and leaves the server):</p>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Call</th>
+<th>Approx. server traffic</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Relayed voice call (Opus ~40 kbit/s each way)</td>
+<td>~0.16 Mbit/s</td>
+</tr>
+<tr>
+<td>Relayed video call (~1.5 Mbit/s each way)</td>
+<td>~6 Mbit/s</td>
+</tr>
+</tbody></table></div>
+<p>With a 200 Mbit/s server link (check the actual Contabo plan), that&#39;s roughly <strong>1,000 relayed voice calls</strong> or
+<strong>~30 relayed video calls</strong>, far beyond the 41-port limit. So <strong>ports are the bottleneck, not bandwidth</strong>.</p>
+<h3 id="realistic-summary-for-h_chat-10"><a class="anchor" href="#realistic-summary-for-h_chat-10">Realistic summary for H_CHAT 1.0</a></h3>
+<ul>
+<li><strong>Voice/video 1:1 calls:</strong> dozens at the same time comfortably (many go direct; ~20 fully relayed at worst).</li>
+<li><strong>Group calls:</strong> a few at the same time; one 6-person relayed video call uses most of the relay.</li>
+<li><strong>Each phone in a 6-person video call</strong> uploads 5 video streams (~5 Mbit/s): fine on Wi-Fi, heavy on mobile data.</li>
+</ul>
+<h2 id="74-scaling-plan"><a class="anchor" href="#74-scaling-plan">7.4 Scaling plan</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Change</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1 (minutes)</td>
+<td>Widen coturn relay range, e.g. <code>min-port=49152</code>, <code>max-port=65535</code>, raise <code>total-quota</code>, open the range in the firewall</td>
+<td>Relayed calls limited by bandwidth instead of ports: hundreds of calls</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Move coturn to its own small server (or add a second one in another region)</td>
+<td>Calls don&#39;t compete with the web apps for CPU/bandwidth</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Group calls with an SFU (LiveKit, mediasoup, Janus) instead of mesh</td>
+<td>Groups of 10+, each phone uploads one stream (E2E via insertable streams)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Socket.IO Redis adapter + several backend processes; MongoDB replica set</td>
+<td>More users, no single point of failure for the database</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Object storage for encrypted file pieces (S3-compatible)</td>
+<td>Media no longer limited by the VPS disk</td>
+</tr>
+</tbody></table></div>
+
+<footer>
+  <span><a href="06-hosting-and-operations">← 6. Hosting and operations</a></span>
+  <span><a href="08-security">8. Security →</a></span>
+</footer>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+</main>
+</div>
+</body>
+</html>

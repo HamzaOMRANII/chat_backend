@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>H_CHAT documentation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
+  <span class="version">version 1.1.1</span>
+</header>
+<div class="layout">
+<nav aria-label="Chapters">
+<a href="./" aria-current="page">Overview</a>
+<a href="01-architecture">1. Architecture</a>
+<a href="02-tech-stack">2. Technology stack</a>
+<a href="03-encryption">3. Encryption</a>
+<a href="04-chat-flows">4. How chats work</a>
+<a href="05-calls">5. How calls work</a>
+<a href="06-hosting-and-operations">6. Hosting and operations</a>
+<a href="07-limits-and-capacity">7. Limits and capacity</a>
+<a href="08-security">8. Security</a>
+<a href="09-api-reference">9. API and events reference</a>
+<a href="10-ux-ui">10. UX and UI design</a>
+<a href="11-uml">11. UML models</a>
+<a href="12-data-model">12. Data model</a>
+<a href="13-developer-guide">13. Developer guide</a>
+<a href="14-operations-runbook">14. Operations runbook</a>
+<a href="15-versions">15. Versions and milestones</a>
+<form method="post" action="lock"><button type="submit">Lock the documentation</button></form>
+</nav>
+<main>
+<h1 id="h_chat-technical-documentation"><a class="anchor" href="#h_chat-technical-documentation">H_CHAT — Technical documentation</a></h1>
+<p><strong>Version documented:</strong> H_CHAT 1.1.1 (2026-10-30, tag <code>v1.1.1</code>) · first release 1.0.0 on 2026-10-18</p>
+<p><strong>Audience:</strong> developers, operators and security reviewers joining the project.</p>
+<p>H_CHAT is a private, invitation-only messenger with end-to-end encryption. People can only join after an
+administrator approves them, can only talk to contacts they added themselves, and every message, file and call
+is encrypted on their own device before it leaves it. The server stores and relays scrambled data plus the
+metadata it needs to work (who, when, how big), never the content.</p>
+<h2 id="the-documents"><a class="anchor" href="#the-documents">The documents</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Document</th>
+<th>What it answers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><a href="01-architecture">Architecture</a></td>
+<td>The three applications, how they connect, where data lives</td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="02-tech-stack">Technology stack</a></td>
+<td>Languages, frameworks, libraries, the call stack, noise suppression</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="03-encryption">Encryption</a></td>
+<td>Keys, algorithms, where encryption happens (devices, not the server), what the server can see</td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="04-chat-flows">How chats work</a></td>
+<td>Sign-in, contacts, stored chats, live chats, files, groups, export — with sequence diagrams</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="05-calls">How calls work</a></td>
+<td>1:1 and group calls, WebRTC, the TURN relay, ringing, audio processing and routing</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="06-hosting-and-operations">Hosting and operations</a></td>
+<td>Server, network path, ports, processes, deploys, backups</td>
+</tr>
+<tr>
+<td>7</td>
+<td><a href="07-limits-and-capacity">Limits and capacity</a></td>
+<td>Product limits, how many simultaneous calls, scaling plan</td>
+</tr>
+<tr>
+<td>8</td>
+<td><a href="08-security">Security</a></td>
+<td>Threat model, controls in place, risks ranked with recommendations</td>
+</tr>
+<tr>
+<td>9</td>
+<td><a href="09-api-reference">API and events reference</a></td>
+<td>Every REST route and real-time event</td>
+</tr>
+<tr>
+<td>10</td>
+<td><a href="10-ux-ui">UX and UI design</a></td>
+<td>Design principles, colours and type, components, every screen, navigation map, user journeys</td>
+</tr>
+<tr>
+<td>11</td>
+<td><a href="11-uml">UML models</a></td>
+<td>Use cases, classes, sequences, states, components, deployment</td>
+</tr>
+<tr>
+<td>12</td>
+<td><a href="12-data-model">Data model</a></td>
+<td>Every MongoDB collection, its fields, indexes and expiry</td>
+</tr>
+<tr>
+<td>13</td>
+<td><a href="13-developer-guide">Developer guide</a></td>
+<td>Set up, code map, conventions, testing, how to add a feature, releasing</td>
+</tr>
+<tr>
+<td>14</td>
+<td><a href="14-operations-runbook">Operations runbook</a></td>
+<td>Daily checks, symptom → cause → fix, recovery, undoing a release</td>
+</tr>
+<tr>
+<td>15</td>
+<td><a href="15-versions">Versions and milestones</a></td>
+<td>What each milestone and release added</td>
+</tr>
+</tbody></table></div>
+<p>Diagrams are written in <a href="https://mermaid.js.org/">Mermaid</a> inside the Markdown sources
+(<code>chat_backend/documentation/src/</code>). This site is built from them: see the <a href="13-developer-guide#137-updating-this-documentation">Developer guide</a>.</p>
+<h2 id="h_chat-in-one-picture"><a class="anchor" href="#h_chat-in-one-picture">H_CHAT in one picture</a></h2>
+<figure class="diagram"><svg aria-roledescription="flowchart-v2" role="graphics-document document" viewBox="0 0 2418.859375 893.6878662109375" style="max-width: 2418.859375px;" class="flowchart" xmlns="http://www.w3.org/2000/svg" width="100%" id="m0"><style>#m0{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}#m0 .error-icon{fill:#552222;}#m0 .error-text{fill:#552222;stroke:#552222;}#m0 .edge-thickness-normal{stroke-width:1px;}#m0 .edge-thickness-thick{stroke-width:3.5px;}#m0 .edge-pattern-solid{stroke-dasharray:0;}#m0 .edge-thickness-invisible{stroke-width:0;fill:none;}#m0 .edge-pattern-dashed{stroke-dasharray:3;}#m0 .edge-pattern-dotted{stroke-dasharray:2;}#m0 .marker{fill:#666;stroke:#666;}#m0 .marker.cross{stroke:#666;}#m0 svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#m0 p{margin:0;}#m0 .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#000000;}#m0 .cluster-label text{fill:#333;}#m0 .cluster-label span{color:#333;}#m0 .cluster-label span p{background-color:transparent;}#m0 .label text,#m0 span{fill:#000000;color:#000000;}#m0 .node rect,#m0 .node circle,#m0 .node ellipse,#m0 .node polygon,#m0 .node path{fill:#eee;stroke:#999;stroke-width:1px;}#m0 .rough-node .label text,#m0 .node .label text,#m0 .image-shape .label,#m0 .icon-shape .label{text-anchor:middle;}#m0 .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#m0 .rough-node .label,#m0 .node .label,#m0 .image-shape .label,#m0 .icon-shape .label{text-align:center;}#m0 .node.clickable{cursor:pointer;}#m0 .root .anchor path{fill:#666!important;stroke-width:0;stroke:#666;}#m0 .arrowheadPath{fill:#333333;}#m0 .edgePath .path{stroke:#666;stroke-width:2.0px;}#m0 .flowchart-link{stroke:#666;fill:none;}#m0 .edgeLabel{background-color:white;text-align:center;}#m0 .edgeLabel p{background-color:white;}#m0 .edgeLabel rect{opacity:0.5;background-color:white;fill:white;}#m0 .labelBkg{background-color:rgba(255, 255, 255, 0.5);}#m0 .cluster rect{fill:hsl(0, 0%, 98.9215686275%);stroke:#707070;stroke-width:1px;}#m0 .cluster text{fill:#333;}#m0 .cluster span{color:#333;}#m0 div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(-160, 0%, 93.3333333333%);border:1px solid #707070;border-radius:2px;pointer-events:none;z-index:100;}#m0 .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#000000;}#m0 rect.text{fill:none;stroke-width:0;}#m0 .icon-shape,#m0 .image-shape{background-color:white;text-align:center;}#m0 .icon-shape p,#m0 .image-shape p{background-color:white;padding:2px;}#m0 .icon-shape rect,#m0 .image-shape rect{opacity:0.5;background-color:white;fill:white;}#m0 :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker orient="auto" markerHeight="8" markerWidth="8" markerUnits="userSpaceOnUse" refY="5" refX="5" viewBox="0 0 10 10" class="marker flowchart-v2" id="m0_flowchart-v2-pointEnd"><path style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 0 0 L 10 5 L 0 10 z"></path></marker><marker orient="auto" markerHeight="8" markerWidth="8" markerUnits="userSpaceOnUse" refY="5" refX="4.5" viewBox="0 0 10 10" class="marker flowchart-v2" id="m0_flowchart-v2-pointStart"><path style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 0 5 L 10 10 L 10 0 z"></path></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5" refX="11" viewBox="0 0 10 10" class="marker flowchart-v2" id="m0_flowchart-v2-circleEnd"><circle style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" r="5" cy="5" cx="5"></circle></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5" refX="-1" viewBox="0 0 10 10" class="marker flowchart-v2" id="m0_flowchart-v2-circleStart"><circle style="stroke-width: 1; stroke-dasharray: 1, 0;" class="arrowMarkerPath" r="5" cy="5" cx="5"></circle></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5.2" refX="12" viewBox="0 0 11 11" class="marker cross flowchart-v2" id="m0_flowchart-v2-crossEnd"><path style="stroke-width: 2; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 1,1 l 9,9 M 10,1 l -9,9"></path></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5.2" refX="-1" viewBox="0 0 11 11" class="marker cross flowchart-v2" id="m0_flowchart-v2-crossStart"><path style="stroke-width: 2; stroke-dasharray: 1, 0;" class="arrowMarkerPath" d="M 1,1 l 9,9 M 10,1 l -9,9"></path></marker><g class="root"><g class="clusters"><g data-look="classic" id="Server" class="cluster"><rect height="360.6878662109375" width="1834.59375" y="8" x="576.265625" style=""></rect><g transform="translate(1393.5625, 8)" class="cluster-label"><foreignObject height="48" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Server — Contabo VPS, France</p></span></div></foreignObject></g></g><g data-look="classic" id="Admin" class="cluster"><rect height="148" width="192.171875" y="173.6878662109375" x="8" style=""></rect><g transform="translate(49.546875, 173.6878662109375)" class="cluster-label"><foreignObject height="24" width="109.078125"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Administrator</p></span></div></foreignObject></g></g><g data-look="classic" id="Devices" class="cluster"><rect height="241" width="1976.25" y="644.6878662109375" x="8" style=""></rect><g transform="translate(896.125, 644.6878662109375)" class="cluster-label"><foreignObject height="72" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>People's devices — encryption happens HERE</p></span></div></foreignObject></g></g></g><g class="edgePaths"><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_W_CF_0" d="M143.532,765.688L152.972,756.355C162.412,747.021,181.292,728.355,203.465,719.021C225.638,709.688,251.104,709.688,288.496,639.817C325.888,569.945,375.205,430.203,399.864,360.331L424.522,290.46"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_A_CF_1" d="M1802.188,706.517L1798.021,705.712C1793.854,704.908,1785.521,703.298,1757.234,702.493C1728.948,701.688,1680.708,701.688,1623.829,701.688C1566.951,701.688,1501.432,701.688,1434.201,701.688C1366.969,701.688,1298.023,701.688,1221.051,701.688C1144.078,701.688,1059.078,701.688,975.094,701.688C891.109,701.688,808.141,701.688,741.839,701.688C675.536,701.688,625.901,701.688,596.917,701.688C567.932,701.688,559.599,701.688,538.582,633.169C517.565,564.649,483.864,427.611,467.014,359.091L450.163,290.572"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_B_CF_2" d="M175.172,247.688L179.339,247.688C183.505,247.688,191.839,247.688,208.738,247.688C225.638,247.688,251.104,247.688,275.904,247.688C300.703,247.688,324.836,247.688,336.902,247.688L348.969,247.688"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_CF_N_3" d="M526.266,247.688L530.432,247.688C534.599,247.688,542.932,247.688,551.266,247.688C559.599,247.688,567.932,247.688,575.599,247.688C583.266,247.688,590.266,247.688,593.766,247.688L597.266,247.688"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_N_API_4" d="M849.078,247.688L869.911,247.688C890.745,247.688,932.411,247.688,973.411,247.688C1014.411,247.688,1054.745,247.688,1074.911,247.688L1095.078,247.688"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_API_DB_5" d="M1299.302,196.688L1322.07,180.152C1344.839,163.616,1390.377,130.545,1428.765,114.009C1467.154,97.473,1498.393,97.473,1514.013,97.473L1529.633,97.473"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_API_F_6" d="M1359.078,252.716L1371.884,253.211C1384.69,253.707,1410.302,254.697,1440.016,255.193C1469.729,255.688,1503.544,255.688,1520.452,255.688L1537.359,255.688"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" marker-start="url(#m0_flowchart-v2-pointStart)" style="" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" id="L_W_A_7" d="M175.929,769.546L179.97,767.57C184.01,765.593,192.091,761.641,208.864,759.664C225.638,757.688,251.104,757.688,291.012,757.688C330.919,757.688,385.268,757.688,431.051,757.688C476.833,757.688,514.049,757.688,536.824,757.688C559.599,757.688,567.932,757.688,596.917,757.688C625.901,757.688,675.536,757.688,741.839,757.688C808.141,757.688,891.109,757.688,975.094,757.688C1059.078,757.688,1144.078,757.688,1221.051,757.688C1298.023,757.688,1366.969,757.688,1434.201,757.688C1501.432,757.688,1566.951,757.688,1623.829,757.688C1680.708,757.688,1728.948,757.688,1756.605,756.458C1784.261,755.228,1791.335,752.768,1794.872,751.538L1798.409,750.309"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" marker-start="url(#m0_flowchart-v2-pointStart)" style="" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" id="L_W_T_8" d="M176.268,818.21L180.252,818.956C184.236,819.702,192.204,821.195,208.921,821.942C225.638,822.688,251.104,822.688,291.012,822.688C330.919,822.688,385.268,822.688,431.051,822.688C476.833,822.688,514.049,822.688,536.824,822.688C559.599,822.688,567.932,822.688,596.917,822.688C625.901,822.688,675.536,822.688,741.839,822.688C808.141,822.688,891.109,822.688,975.094,822.688C1059.078,822.688,1144.078,822.688,1221.051,822.688C1298.023,822.688,1366.969,822.688,1434.201,822.688C1501.432,822.688,1566.951,822.688,1623.829,822.688C1680.708,822.688,1728.948,822.688,1770.323,822.688C1811.698,822.688,1846.208,822.688,1880.719,822.688C1915.229,822.688,1949.74,822.688,1983.924,721.047C2018.109,619.407,2051.969,416.125,2085.167,312.297C2118.366,208.469,2150.904,204.094,2167.173,201.906L2183.442,199.719"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" marker-start="url(#m0_flowchart-v2-pointStart)" style="" class="edge-thickness-normal edge-pattern-dotted edge-thickness-normal edge-pattern-solid flowchart-link" id="L_A_T_9" d="M1963.25,721.688L1966.75,721.688C1970.25,721.688,1977.25,721.688,1997.68,628.881C2018.109,536.073,2051.969,350.459,2085.165,259.352C2118.361,168.246,2150.895,171.649,2167.161,173.35L2183.428,175.051"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_API_G_10" d="M1359.078,272.829L1371.884,275.305C1384.69,277.782,1410.302,282.735,1447.101,304.132C1483.9,325.529,1531.886,363.37,1555.879,382.29L1579.872,401.211"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_G_A_11" d="M1656.084,481.688L1676.268,515.021C1696.452,548.355,1736.82,615.021,1760.548,649.724C1784.277,684.427,1791.367,687.166,1794.911,688.536L1798.456,689.905"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_API_WP_12" d="M1354.657,298.688L1368.2,304.188C1381.743,309.688,1408.828,320.688,1449.361,359.006C1489.894,397.325,1543.874,462.962,1570.864,495.78L1597.854,528.598"></path><path marker-end="url(#m0_flowchart-v2-pointEnd)" style="" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" id="L_WP_W_13" d="M1605.477,609.688L1577.217,650.521C1548.956,691.355,1492.435,773.021,1429.702,813.855C1366.969,854.688,1298.023,854.688,1221.051,854.688C1144.078,854.688,1059.078,854.688,975.094,854.688C891.109,854.688,808.141,854.688,741.839,854.688C675.536,854.688,625.901,854.688,596.917,854.688C567.932,854.688,559.599,854.688,536.824,854.688C514.049,854.688,476.833,854.688,431.051,854.688C385.268,854.688,330.919,854.688,291.012,854.688C251.104,854.688,225.638,854.688,208.857,852.581C192.076,850.475,183.98,846.262,179.932,844.156L175.884,842.049"></path></g><g class="edgeLabels"><g transform="translate(276.5703125, 709.6878662109375)" class="edgeLabel"><g transform="translate(-51.3984375, -12)" class="label"><foreignObject height="24" width="102.796875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>HTTPS / WSS</p></span></div></foreignObject></g></g><g transform="translate(1229.078125, 701.6878662109375)" class="edgeLabel"><g transform="translate(-51.3984375, -12)" class="label"><foreignObject height="24" width="102.796875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>HTTPS / WSS</p></span></div></foreignObject></g></g><g transform="translate(276.5703125, 247.6878662109375)" class="edgeLabel"><g transform="translate(-51.3984375, -12)" class="label"><foreignObject height="24" width="102.796875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>HTTPS / WSS</p></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g transform="translate(974.078125, 757.6878662109375)" class="edgeLabel"><g transform="translate(-100, -36)" class="label"><foreignObject height="72" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>calls: audio/video<br>(DTLS-SRTP, direct or via relay)</p></span></div></foreignObject></g></g><g transform="translate(1229.078125, 822.6878662109375)" class="edgeLabel"><g transform="translate(-76.578125, -12)" class="label"><foreignObject height="24" width="153.15625"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>relay when needed</p></span></div></foreignObject></g></g><g transform="translate(2085.828125, 164.84393310546875)" class="edgeLabel"><g transform="translate(-76.578125, -12)" class="label"><foreignObject height="24" width="153.15625"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>relay when needed</p></span></div></foreignObject></g></g><g transform="translate(1435.9140625, 287.6878662109375)" class="edgeLabel"><g transform="translate(-51.8359375, -12)" class="label"><foreignObject height="24" width="103.671875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>generic push</p></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g><g transform="translate(1435.9140625, 331.6878662109375)" class="edgeLabel"><g transform="translate(-51.8359375, -12)" class="label"><foreignObject height="24" width="103.671875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"><p>generic push</p></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" class="labelBkg" xmlns="http://www.w3.org/1999/xhtml"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g transform="translate(104.0859375, 804.6878662109375)" id="flowchart-W-0" class="node default"><rect height="78" width="136.5" y="-39" x="-68.25" style="" class="basic label-container"></rect><g transform="translate(-38.25, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="76.5"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Web app<br>(browser)</p></span></div></foreignObject></g></g><g transform="translate(1880.71875, 721.6878662109375)" id="flowchart-A-1" class="node default"><rect height="78" width="157.0625" y="-39" x="-78.53125" style="" class="basic label-container"></rect><g transform="translate(-48.53125, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="97.0625"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Android app<br>(Capacitor)</p></span></div></foreignObject></g></g><g transform="translate(104.0859375, 247.6878662109375)" id="flowchart-B-2" class="node default"><rect height="78" width="142.171875" y="-39" x="-71.0859375" style="" class="basic label-container"></rect><g transform="translate(-41.0859375, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="82.171875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Backoffice<br>(browser)</p></span></div></foreignObject></g></g><g transform="translate(725.171875, 247.6878662109375)" id="flowchart-N-3" class="node default"><rect height="78" width="247.8125" y="-39" x="-123.90625" style="" class="basic label-container"></rect><g transform="translate(-93.90625, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="187.8125"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>nginx<br>(TLS, gates, static files)</p></span></div></foreignObject></g></g><g transform="translate(1229.078125, 247.6878662109375)" id="flowchart-API-4" class="node default"><rect height="102" width="260" y="-51" x="-130" style="" class="basic label-container"></rect><g transform="translate(-100, -36)" style="" class="label"><rect></rect><foreignObject height="72" width="200"><div style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>chat_backend<br>Node.js · Express · Socket.IO</p></span></div></foreignObject></g></g><g transform="translate(1632.46875, 97.47286224365234)" id="flowchart-DB-5" class="node default"><path transform="translate(-98.8359375, -54.47285845721757)" style="" class="basic label-container" d="M0,15.31523897147838 a98.8359375,15.31523897147838 0,0,0 197.671875,0 a98.8359375,15.31523897147838 0,0,0 -197.671875,0 l0,78.31523897147838 a98.8359375,15.31523897147838 0,0,0 197.671875,0 l0,-78.31523897147838"></path><g transform="translate(-91.3359375, -14)" style="" class="label"><rect></rect><foreignObject height="48" width="182.671875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>MongoDB 8<br>ciphertext + metadata</p></span></div></foreignObject></g></g><g transform="translate(1632.46875, 255.6878662109375)" id="flowchart-F-6" class="node default"><path transform="translate(-91.109375, -53.742142203234664)" style="" class="basic label-container" d="M0,14.828094802156443 a91.109375,14.828094802156443 0,0,0 182.21875,0 a91.109375,14.828094802156443 0,0,0 -182.21875,0 l0,77.82809480215644 a91.109375,14.828094802156443 0,0,0 182.21875,0 l0,-77.82809480215644"></path><g transform="translate(-83.609375, -14)" style="" class="label"><rect></rect><foreignObject height="48" width="167.21875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Media folder<br>encrypted file pieces</p></span></div></foreignObject></g></g><g transform="translate(2286.6328125, 185.84393310546875)" id="flowchart-T-7" class="node default"><rect height="78" width="198.453125" y="-39" x="-99.2265625" style="" class="basic label-container"></rect><g transform="translate(-69.2265625, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="138.453125"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>coturn<br>TURN/STUN relay</p></span></div></foreignObject></g></g><g transform="translate(439.6171875, 247.6878662109375)" id="flowchart-CF-8" class="node default"><rect height="78" width="173.296875" y="-39" x="-86.6484375" style="" class="basic label-container"></rect><g transform="translate(-56.6484375, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="113.296875"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Cloudflare<br>(HTTPS proxy)</p></span></div></foreignObject></g></g><g transform="translate(1632.46875, 442.6878662109375)" id="flowchart-G-9" class="node default"><rect height="78" width="188.203125" y="-39" x="-94.1015625" style="" class="basic label-container"></rect><g transform="translate(-64.1015625, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="128.203125"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Google Firebase<br>(Android push)</p></span></div></foreignObject></g></g><g transform="translate(1632.46875, 570.6878662109375)" id="flowchart-WP-10" class="node default"><rect height="78" width="239.4375" y="-39" x="-119.71875" style="" class="basic label-container"></rect><g transform="translate(-89.71875, -24)" style="" class="label"><rect></rect><foreignObject height="48" width="179.4375"><div style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;" xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>Browser push services<br>(Web Push)</p></span></div></foreignObject></g></g></g></g></g></svg></figure>
+
+<h2 id="key-facts"><a class="anchor" href="#key-facts">Key facts</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Applications</td>
+<td><code>chat_backend</code> (API + real-time), <code>chat_app</code> (web + Android), <code>chat_backoffice</code> (admin)</td>
+</tr>
+<tr>
+<td>Repositories</td>
+<td>github.com/HamzaOMRANII/chat_backend · chat_app · chat_backoffice (branch <code>main</code>, latest tag <code>v1.1.1</code>)</td>
+</tr>
+<tr>
+<td>Addresses</td>
+<td>chat.omranisystems.com · adminchat.omranisystems.com · turn.omranisystems.com</td>
+</tr>
+<tr>
+<td>Encryption</td>
+<td>libsodium on the devices: Ed25519, X25519, XChaCha20-Poly1305, BLAKE2b; calls: WebRTC DTLS-SRTP with signed offers</td>
+</tr>
+<tr>
+<td>Server can read</td>
+<td>Accounts, contact lists, who talks with whom and when, sizes — <strong>not</strong> messages, files or call audio/video</td>
+</tr>
+<tr>
+<td>Hosting</td>
+<td>One Contabo VPS (4 vCPU, 7.8 GB RAM, 96 GB disk), Ubuntu 24.04, France (Grand Est)</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>Backend 116 · App 32 · Backoffice 9 (Vitest), plus Playwright browser scenarios; <code>npm run check</code> in each repository</td>
+</tr>
+</tbody></table></div>
+
+<footer>
+  <span></span>
+  <span><a href="01-architecture">1. Architecture →</a></span>
+</footer>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+</main>
+</div>
+</body>
+</html>

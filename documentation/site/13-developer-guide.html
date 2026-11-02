@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>13. Developer guide · H_CHAT documentation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
+  <span class="version">version 1.1.1</span>
+</header>
+<div class="layout">
+<nav aria-label="Chapters">
+<a href="./">Overview</a>
+<a href="01-architecture">1. Architecture</a>
+<a href="02-tech-stack">2. Technology stack</a>
+<a href="03-encryption">3. Encryption</a>
+<a href="04-chat-flows">4. How chats work</a>
+<a href="05-calls">5. How calls work</a>
+<a href="06-hosting-and-operations">6. Hosting and operations</a>
+<a href="07-limits-and-capacity">7. Limits and capacity</a>
+<a href="08-security">8. Security</a>
+<a href="09-api-reference">9. API and events reference</a>
+<a href="10-ux-ui">10. UX and UI design</a>
+<a href="11-uml">11. UML models</a>
+<a href="12-data-model">12. Data model</a>
+<a href="13-developer-guide" aria-current="page">13. Developer guide</a>
+<a href="14-operations-runbook">14. Operations runbook</a>
+<a href="15-versions">15. Versions and milestones</a>
+<form method="post" action="lock"><button type="submit">Lock the documentation</button></form>
+</nav>
+<main>
+<h1 id="13-developer-guide"><a class="anchor" href="#13-developer-guide">13. Developer guide</a></h1>
+<p>Everything a developer needs to fix a bug or add a feature without help. Each repository&#39;s <code>README.md</code> has the
+same information in short form.</p>
+<h2 id="131-set-up"><a class="anchor" href="#131-set-up">13.1 Set up</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Version</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Node.js</td>
+<td>24 (the server has 24.22)</td>
+</tr>
+<tr>
+<td>MongoDB</td>
+<td>8, with a test user for the backend tests (see <code>chat_backend/tests/helpers.ts</code>)</td>
+</tr>
+<tr>
+<td>For the APK only</td>
+<td>Java 21, Android SDK in <code>/opt/android-sdk</code>, the signing key in <code>/root/.chat-keystore/</code></td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-bash">git clone git@github.com:HamzaOMRANII/chat_backend.git    # and chat_app, chat_backoffice
+cd chat_backend &amp;&amp; cp .env.example .env &amp;&amp; npm ci &amp;&amp; npm run dev     # API on 127.0.0.1:12000
+cd ../chat_app &amp;&amp; npm ci &amp;&amp; npm run dev                              # web app, proxies /api to 12000
+cd ../chat_backoffice &amp;&amp; npm ci &amp;&amp; npm run dev                       # backoffice, proxies /api/admin
+cd ../chat_backend &amp;&amp; npm run create-admin                           # once: a backoffice administrator
+</code></pre>
+<h2 id="132-the-same-commands-in-every-repository"><a class="anchor" href="#132-the-same-commands-in-every-repository">13.2 The same commands in every repository</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>npm run dev</code></td>
+<td>Run with live reload</td>
+</tr>
+<tr>
+<td><code>npm test</code></td>
+<td>All tests (Vitest)</td>
+</tr>
+<tr>
+<td><code>npm run lint</code></td>
+<td>Code checker (Biome): house style and likely bugs; warnings are improvements, errors must be fixed</td>
+</tr>
+<tr>
+<td><code>npm run format</code></td>
+<td>Rewrites files in the house style (2 spaces, double quotes, semicolons, 160 columns)</td>
+</tr>
+<tr>
+<td><code>npm run typecheck</code></td>
+<td>TypeScript (strict)</td>
+</tr>
+<tr>
+<td><strong><code>npm run check</code></strong></td>
+<td>lint + typecheck + tests: <strong>must pass before every commit</strong></td>
+</tr>
+<tr>
+<td><code>npm run build</code></td>
+<td>Production build</td>
+</tr>
+<tr>
+<td><code>npm run release</code> (chat_app)</td>
+<td>Tests, version bump, web build and signed APK, published</td>
+</tr>
+</tbody></table></div>
+<h2 id="133-code-map-quotwhere-isquot"><a class="anchor" href="#133-code-map-quotwhere-isquot">13.3 Code map: &quot;where is…?&quot;</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>I want to change…</th>
+<th>Look in</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A screen of the app</td>
+<td><code>chat_app/src/pages/&lt;Name&gt;Page.tsx</code> (search for the visible title)</td>
+</tr>
+<tr>
+<td>A reusable piece (button, field, sheet)</td>
+<td><code>chat_app/src/components/</code></td>
+</tr>
+<tr>
+<td>Colours, fonts</td>
+<td><code>chat_app/src/styles.css</code> (<code>@theme</code> tokens)</td>
+</tr>
+<tr>
+<td>Encryption</td>
+<td><code>chat_app/src/lib/e2e.ts</code> (+ <code>e2e.test.ts</code>)</td>
+</tr>
+<tr>
+<td>Calls</td>
+<td><code>chat_app/src/lib/calls.ts</code>, <code>components/CallScreen.tsx</code>, backend <code>modules/calls/</code> + <code>realtime/</code></td>
+</tr>
+<tr>
+<td>An API route</td>
+<td><code>chat_backend/src/modules/&lt;feature&gt;/routes.ts</code> (logic in <code>service.ts</code>)</td>
+</tr>
+<tr>
+<td>Sign-in, sessions, locks, secure code</td>
+<td><code>chat_backend/src/modules/auth/routes.ts</code>, <code>sessions.ts</code></td>
+</tr>
+<tr>
+<td>A backoffice action</td>
+<td><code>chat_backend/src/modules/admin/&lt;section&gt;.ts</code> + <code>chat_backoffice/src/pages/&lt;Section&gt;Page.tsx</code></td>
+</tr>
+<tr>
+<td>A database field</td>
+<td><code>chat_backend/src/models/&lt;model&gt;.ts</code></td>
+</tr>
+<tr>
+<td>Real-time events</td>
+<td><code>chat_backend/src/realtime/index.ts</code>, <code>lib/events.ts</code> (bus)</td>
+</tr>
+<tr>
+<td>Expiry and cleanup</td>
+<td><code>chat_backend/src/jobs/cleanup.ts</code> + TTL indexes in the models</td>
+</tr>
+<tr>
+<td>Emails</td>
+<td><code>chat_backend/src/lib/mailer.ts</code></td>
+</tr>
+<tr>
+<td>Settings from <code>.env</code></td>
+<td><code>chat_backend/src/config/env.ts</code> (validated at start)</td>
+</tr>
+<tr>
+<td>Android-only behaviour</td>
+<td><code>chat_app/src/lib/native.ts</code>, <code>platform.ts</code>, <code>chat_app/android/app/src/main/java/…</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="134-conventions"><a class="anchor" href="#134-conventions">13.4 Conventions</a></h2>
+<ul>
+<li><strong>TypeScript strict</strong> everywhere; validate every request body and query with <strong>zod</strong> (<code>parse(schema, data)</code>).</li>
+<li><strong>Errors:</strong> throw <code>badRequest</code>, <code>unauthorized</code>, <code>forbidden</code>, <code>notFound</code>, <code>conflict</code>, <code>locked</code> from
+<code>lib/errors.ts</code>. They become <code>{ error, code, details }</code>. Write <code>error</code> for people (the app shows it as-is),
+and <code>code</code> for programs (<code>wrong_secure_code</code>, <code>challenge_expired</code>, …).</li>
+<li><strong>Secrets:</strong> Argon2id (<code>hashSecret</code> / <code>verifySecret</code>) for anything a person chooses; SHA-256 only for
+short-lived random codes. Never log or return them; <code>select: false</code> on the schema.</li>
+<li><strong>Comments</strong> explain <em>why</em> (rules, limits, surprises), not what the next line does.</li>
+<li><strong>Names:</strong> React hooks start with <code>use</code>, nothing else does (the call methods are <code>selectMic</code>, <code>selectOutput</code>, …).</li>
+<li><strong>Commits:</strong> one subject line saying what changed, a body saying why. Each milestone on a branch
+<code>mNN-&lt;name&gt;</code>, merged to <code>main</code> with <code>--no-ff</code> after approval, tagged <code>vX.Y.Z</code>.</li>
+</ul>
+<h2 id="135-testing"><a class="anchor" href="#135-testing">13.5 Testing</a></h2>
+<div class="table"><table>
+<thead>
+<tr>
+<th>Repository</th>
+<th>How</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>chat_backend</td>
+<td>Supertest against the real app and a <strong>real MongoDB test database</strong> (dropped between tests). Helpers: <code>makeApp()</code>, <code>approvedUser()</code>, <code>signIn()</code>, <code>adminAgent()</code>; <code>mail.sent</code> / <code>mail.alerts</code> capture emails</td>
+<td><code>tests/secureCode.test.ts</code></td>
+</tr>
+<tr>
+<td>chat_app</td>
+<td>The whole <code>&lt;App /&gt;</code> in jsdom with a fake server (<code>routes[&quot;/api/…&quot;] = () =&gt; [status, body]</code>) and a fake socket; libsodium is replaced by a transparent stand-in (real crypto is tested in <code>lib/e2e.test.ts</code>)</td>
+<td><code>src/app/App.test.tsx</code></td>
+</tr>
+<tr>
+<td>chat_backoffice</td>
+<td>Same approach, routes keyed by <code>&quot;METHOD /api/admin/…&quot;</code></td>
+<td><code>src/app/App.test.tsx</code></td>
+</tr>
+<tr>
+<td>Browser</td>
+<td><code>npx tsx tests/e2e/server.ts 4790</code> in chat_backend: real API on the test database, fake mailer (<code>/__codes</code>), the built app; drive it with Playwright</td>
+<td>the screenshots in <a href="10-ux-ui">UX and UI</a></td>
+</tr>
+</tbody></table></div>
+<p>Rules: one backend test run at a time (a lock file enforces it). In UI tests use <code>await screen.findBy…</code> for
+anything that appears after a request: <code>getBy…</code> there makes the test fail at random on a busy machine.</p>
+<h2 id="136-how-to-add-a-feature-worked-example-the-secure-code-110"><a class="anchor" href="#136-how-to-add-a-feature-worked-example-the-secure-code-110">13.6 How to add a feature (worked example: the secure code, 1.1.0)</a></h2>
+<ol>
+<li><strong>Model:</strong> fields on <code>User</code> (<code>secureCodeHash</code> with <code>select: false</code>, <code>secureCodeSetAt</code>, <code>secureCodeDisabled</code>),
+removed in <code>toJSON</code>; new security-log types in <code>deviceEvent.ts</code>.</li>
+<li><strong>Validation:</strong> <code>secureCodeSchema</code> in <code>lib/validate.ts</code>.</li>
+<li><strong>Routes:</strong> <code>POST /auth/verify-secure-code</code> (re-uses the login challenge, lock and session helpers),
+<code>GET/PUT/DELETE /me/secure-code</code> (password required), <code>PUT /admin/users/:id/secure-code</code>.</li>
+<li><strong>Email:</strong> <code>sendSecureCodeAlert</code> in <code>lib/mailer.ts</code> (and in the fake mailer in <code>tests/helpers.ts</code>).</li>
+<li><strong>Backend tests:</strong> <code>tests/secureCode.test.ts</code> covers set, remove, sign-in, wrong codes, lock, admin switch, reset.</li>
+<li><strong>App:</strong> <code>CodePage.tsx</code> (5 taps reveal the field), <code>components/SecureCodeSettings.tsx</code> in Settings, labels in
+<code>SecurityLogPage.tsx</code>, a test in <code>App.test.tsx</code>.</li>
+<li><strong>Backoffice:</strong> panel on <code>UserDetailsPage.tsx</code>, labels in <code>lib/format.ts</code>.</li>
+<li><code>npm run check</code> in all three, commit on the milestone branch, deploy, test on a phone, merge, tag.</li>
+</ol>
+<h2 id="137-updating-this-documentation"><a class="anchor" href="#137-updating-this-documentation">13.7 Updating this documentation</a></h2>
+<p>The site you are reading is built from Markdown:</p>
+<pre><code>chat_backend/documentation/
+  src/*.md          the chapters (Markdown + Mermaid diagrams); src/images/*.png screenshots
+  build.mjs         renders src → site/ (one HTML page per chapter, diagrams pre-rendered to SVG)
+  site/             the built site, committed, served at /documentation by the backend
+</code></pre>
+<pre><code class="language-bash">cd chat_backend/documentation
+npm ci                 # once: marked, mermaid, playwright (headless Chromium renders the diagrams)
+npm run build          # writes site/
+</code></pre>
+<p>Then commit <code>src/</code> and <code>site/</code> together and restart the backend (<code>bash /projects/hchat-deploy.sh</code>).
+The access code is stored only as an Argon2id hash in <code>chat_backend/.env</code> (<code>DOCS_CODE_HASH</code>). To change it:
+<code>node -e &quot;require(&#39;argon2&#39;).hash(process.argv[1]).then(console.log)&quot; &lt;new code&gt;</code> (from <code>chat_backend</code>), put the
+result in <code>.env</code>, restart.</p>
+<h2 id="138-releasing"><a class="anchor" href="#138-releasing">13.8 Releasing</a></h2>
+<pre><code class="language-bash">bash /projects/hchat-deploy.sh          # bug fix:   x.y.Z+1 (server + backoffice + web + APK)
+bash /projects/hchat-deploy.sh minor    # milestone: x.Y+1.0
+</code></pre>
+<p>Every user-visible change ships to the web <strong>and</strong> the APK together. Phones show &quot;Update available&quot;; raise the
+minimum version in the backoffice only when old apps must stop working.</p>
+
+<footer>
+  <span><a href="12-data-model">← 12. Data model</a></span>
+  <span><a href="14-operations-runbook">14. Operations runbook →</a></span>
+</footer>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+</main>
+</div>
+</body>
+</html>
