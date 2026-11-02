@@ -117,8 +117,12 @@ cd ../chat_backend &amp;&amp; npm run create-admin                           # o
 <td><code>chat_app/src/pages/&lt;Name&gt;Page.tsx</code> (search for the visible title)</td>
 </tr>
 <tr>
-<td>A reusable piece (button, field, sheet)</td>
-<td><code>chat_app/src/components/</code></td>
+<td>A reusable piece (button, field, sheet, message bar <code>Composer</code>, <code>UploadBubble</code>)</td>
+<td><code>chat_app/src/components/</code>; hooks (<code>useUploads</code>, <code>useMediaQuery</code>) in <code>chat_app/src/hooks/</code></td>
+</tr>
+<tr>
+<td>Which screens load on demand</td>
+<td><code>chat_app/src/app/App.tsx</code> (<code>lazy(() =&gt; import(...))</code>)</td>
 </tr>
 <tr>
 <td>Colours, fonts</td>

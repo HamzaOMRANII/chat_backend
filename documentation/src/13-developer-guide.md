@@ -37,7 +37,8 @@ cd ../chat_backend && npm run create-admin                           # once: a b
 | I want to change… | Look in |
 |---|---|
 | A screen of the app | `chat_app/src/pages/<Name>Page.tsx` (search for the visible title) |
-| A reusable piece (button, field, sheet) | `chat_app/src/components/` |
+| A reusable piece (button, field, sheet, message bar `Composer`, `UploadBubble`) | `chat_app/src/components/`; hooks (`useUploads`, `useMediaQuery`) in `chat_app/src/hooks/` |
+| Which screens load on demand | `chat_app/src/app/App.tsx` (`lazy(() => import(...))`) |
 | Colours, fonts | `chat_app/src/styles.css` (`@theme` tokens) |
 | Encryption | `chat_app/src/lib/e2e.ts` (+ `e2e.test.ts`) |
 | Calls | `chat_app/src/lib/calls.ts`, `components/CallScreen.tsx`, backend `modules/calls/` + `realtime/` |
