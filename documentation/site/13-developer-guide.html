@@ -10,7 +10,7 @@
 <body>
 <header class="top">
   <a class="brand" href="./">H<span>_</span>CHAT <small>docs</small></a>
-  <span class="version">version 1.1.1</span>
+  <span class="version">version 1.1.2</span>
 </header>
 <div class="layout">
 <nav aria-label="Chapters">
@@ -117,8 +117,12 @@ cd ../chat_backend &amp;&amp; npm run create-admin                           # o
 <td><code>chat_app/src/pages/&lt;Name&gt;Page.tsx</code> (search for the visible title)</td>
 </tr>
 <tr>
-<td>A reusable piece (button, field, sheet)</td>
-<td><code>chat_app/src/components/</code></td>
+<td>A reusable piece (button, field, sheet, message bar <code>Composer</code>, <code>UploadBubble</code>)</td>
+<td><code>chat_app/src/components/</code>; hooks (<code>useUploads</code>, <code>useMediaQuery</code>) in <code>chat_app/src/hooks/</code></td>
+</tr>
+<tr>
+<td>Which screens load on demand</td>
+<td><code>chat_app/src/app/App.tsx</code> (<code>lazy(() =&gt; import(...))</code>)</td>
 </tr>
 <tr>
 <td>Colours, fonts</td>
@@ -254,7 +258,7 @@ minimum version in the backoffice only when old apps must stop working.</p>
   <span><a href="12-data-model">← 12. Data model</a></span>
   <span><a href="14-operations-runbook">14. Operations runbook →</a></span>
 </footer>
-<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.1</p>
+<p class="meta">Built from chat_backend/documentation/src · H_CHAT 1.1.2</p>
 </main>
 </div>
 </body>

@@ -88,7 +88,8 @@ outer.post("/__group", express.json(), async (req, res) => {
   await systemLine(group, "created");
   res.json({ id: group.id });
 });
-outer.use(express.static(join(import.meta.dirname, "../../../chat_app/dist")));
+// E2E_APP_DIST: test another build of the app (default: the one nginx serves)
+outer.use(express.static(process.env.E2E_APP_DIST ?? join(import.meta.dirname, "../../../chat_app/dist")));
 // E2E_TURN_SECRET: the real relay's secret, to test calls through turn.omranisystems.com
 const e2eConfig = { ...config, APP_ORIGIN: `http://127.0.0.1:${port}`, ...(process.env.E2E_TURN_SECRET ? { TURN_SECRET: process.env.E2E_TURN_SECRET } : {}) };
 outer.use(createApp(e2eConfig, mail.mailer));

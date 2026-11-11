@@ -15,6 +15,7 @@
 | M11 | Secure code: per-user code instead of the email code (hidden field, alert email, admin switch) | **1.1.0** (2026-10-30) |
 | M10 | Maintainability: code checker and formatter (Biome), `npm run check`, backoffice API split per section, developer guides, troubleshooting guide, reliable tests; backoffice user *Chats* tab fixed | **1.1.1** (2026-10-30) |
 | M12 | This documentation site at `/documentation`, behind the gate and its own access code | backend only |
+| M13 | Refactor and speed-up: expiry job in 2 queries a minute, shared message bar / uploads / time helpers, screens loaded on demand (first download 702 → 445 KB), back office chat components split, dependency updates, libsodium pinned | **1.1.2** |
 
 Every release is tagged in `chat_app` (`v1.0.0`, `v1.1.0`, `v1.1.1`); APKs are kept in
 `/projects/mobile_builds/h_chat/`.
