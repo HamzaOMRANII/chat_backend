@@ -148,40 +148,41 @@ connected users and hundreds of simultaneous call set-ups.</p>
 <h3 id="b-direct-peer-to-peer-calls-no-server-limit"><a class="anchor" href="#b-direct-peer-to-peer-calls-no-server-limit">B. Direct (peer-to-peer) calls — no server limit</a></h3>
 <p>When the two devices connect directly, audio/video <strong>never touches the server</strong>. Their number isn&#39;t limited by
 the server at all; only by the users&#39; own connections.</p>
-<h3 id="c-relayed-calls-through-coturn-the-real-limit-today"><a class="anchor" href="#c-relayed-calls-through-coturn-the-real-limit-today">C. Relayed calls (through coturn) — <strong>the real limit today</strong></a></h3>
+<h3 id="c-relayed-calls-through-coturn"><a class="anchor" href="#c-relayed-calls-through-coturn">C. Relayed calls (through coturn)</a></h3>
 <p>Each device that can&#39;t connect directly uses one <strong>TURN allocation</strong>, and each allocation needs <strong>one relay port</strong>.
-coturn is configured with relay ports <strong>49160–49200 = 41 ports</strong> (<code>total-quota=100</code>, <code>user-quota=12</code>).</p>
+Since 2026-11-11 (M14) coturn has relay ports <strong>49160–50159 = 1,000 ports</strong>, <code>total-quota=500</code> allocations for the
+whole server and <code>user-quota=12</code> per user (before: 41 ports, 100 allocations).</p>
 <div class="table"><table>
 <thead>
 <tr>
 <th>Call type</th>
-<th>Relay ports used</th>
-<th>Maximum at the same time (41 ports)</th>
+<th>Allocations used</th>
+<th>Maximum at the same time (500 allocations)</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>1:1, only one side behind a strict network</td>
 <td>1</td>
-<td>~<strong>40</strong></td>
+<td>~<strong>500</strong></td>
 </tr>
 <tr>
 <td>1:1, both sides relayed</td>
 <td>2</td>
-<td>~<strong>20</strong></td>
+<td>~<strong>250</strong></td>
 </tr>
 <tr>
 <td>Group call of 6, all relayed (mesh: 5 links each)</td>
 <td>up to 30</td>
-<td><strong>1</strong></td>
+<td>~<strong>16</strong></td>
 </tr>
 <tr>
 <td>Group call of 4, all relayed</td>
 <td>up to 12</td>
-<td>~3</td>
+<td>~40</td>
 </tr>
 </tbody></table></div>
 <p>While connecting, a device may briefly open extra allocations (UDP, TCP and TLS are all tried), so the practical
-numbers can be lower at peak moments.</p>
+numbers can be lower at peak moments. With these numbers the <strong>bandwidth below is the real limit</strong>, not the ports.</p>
 <p><strong>Bandwidth through the relay</strong> (each relayed stream enters and leaves the server):</p>
 <div class="table"><table>
 <thead>
@@ -200,11 +201,12 @@ numbers can be lower at peak moments.</p>
 </tr>
 </tbody></table></div>
 <p>With a 200 Mbit/s server link (check the actual Contabo plan), that&#39;s roughly <strong>1,000 relayed voice calls</strong> or
-<strong>~30 relayed video calls</strong>, far beyond the 41-port limit. So <strong>ports are the bottleneck, not bandwidth</strong>.</p>
-<h3 id="realistic-summary-for-h_chat-10"><a class="anchor" href="#realistic-summary-for-h_chat-10">Realistic summary for H_CHAT 1.0</a></h3>
+<strong>~30 relayed video calls</strong>: since M14 <strong>bandwidth is the bottleneck, not ports</strong>.</p>
+<h3 id="realistic-summary-since-112-m14"><a class="anchor" href="#realistic-summary-since-112-m14">Realistic summary (since 1.1.2 / M14)</a></h3>
 <ul>
-<li><strong>Voice/video 1:1 calls:</strong> dozens at the same time comfortably (many go direct; ~20 fully relayed at worst).</li>
-<li><strong>Group calls:</strong> a few at the same time; one 6-person relayed video call uses most of the relay.</li>
+<li><strong>Voice calls:</strong> hundreds at the same time (relayed or not).</li>
+<li><strong>Video calls:</strong> many go direct (no limit); about <strong>30 fully relayed video calls</strong> at once, set by bandwidth.</li>
+<li><strong>Group calls:</strong> several 6-person relayed video calls fit in the relay; bandwidth again decides.</li>
 <li><strong>Each phone in a 6-person video call</strong> uploads 5 video streams (~5 Mbit/s): fine on Wi-Fi, heavy on mobile data.</li>
 </ul>
 <h2 id="74-scaling-plan"><a class="anchor" href="#74-scaling-plan">7.4 Scaling plan</a></h2>
@@ -217,7 +219,7 @@ numbers can be lower at peak moments.</p>
 </tr>
 </thead>
 <tbody><tr>
-<td>1 (minutes)</td>
+<td><del>1</del> <strong>done 2026-11-11 (M14)</strong></td>
 <td>Widen coturn relay range, e.g. <code>min-port=49152</code>, <code>max-port=65535</code>, raise <code>total-quota</code>, open the range in the firewall</td>
 <td>Relayed calls limited by bandwidth instead of ports: hundreds of calls</td>
 </tr>

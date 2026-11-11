@@ -69,7 +69,7 @@ flowchart LR
     NG -->|"127.0.0.1:12000<br/>/api, /socket.io"| H["PM2: h-chat<br/>(Node 24)"]
     H -->|127.0.0.1:27017| M[("MongoDB 8<br/>auth enabled")]
     H --> D[("/var/lib/h-chat/media")]
-    TS["coturn 4.6<br/>UDP/TCP 3478 · TLS 5349<br/>relay UDP 49160–49200"]
+    TS["coturn 4.6<br/>UDP/TCP 3478 · TLS 5349<br/>relay UDP 49160–50159"]
   end
 
   U1 <-.->|"calls: STUN/TURN<br/>(not through Cloudflare)"| TS

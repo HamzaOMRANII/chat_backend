@@ -34,7 +34,7 @@ df -h / /var/lib/h-chat
 | Secure code refused | Not set, switched off, or erased by a reset | Backoffice → user → secure code panel; user sets it again in Settings |
 | Messages locked / unreadable on a device | Device keys changed (new phone, reinstall, cleared data) | Expected: E2E. The other side's new messages work again; old ones can't be recovered |
 | Live updates stop | WebSocket blocked | nginx `/socket.io/` block (Upgrade headers), Cloudflare WebSockets on |
-| Calls connect but no sound / picture | TURN unreachable or out of relay ports | `systemctl status coturn`; `TURN_SECRET` = `static-auth-secret`; widen ports 49160–49200 |
+| Calls connect but no sound / picture | TURN unreachable or out of relay ports | `systemctl status coturn`; `TURN_SECRET` = `static-auth-secret`; widen ports 49160–50159 |
 | No notifications on Android | Firebase key/token | `/root/.hchat/firebase-service-account.json`; user re-opens the app |
 | Uploads refused | 100 MB/file, 2 GB/user, or disk over 80 % | Backoffice → Storage (ask users to download, delete, cleanup) |
 | Phones stuck on "Update required" | Minimum version above the published APK | Backoffice → Settings → minimum version |

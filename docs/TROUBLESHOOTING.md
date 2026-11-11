@@ -27,7 +27,7 @@ Old logs: `/root/.pm2/logs/h-chat-out__<date>.log` and `h-chat-error__<date>.log
 | User signed out by itself | One session per account: a sign-in elsewhere closes the old one ("kicked") | User's security log; `auth/sessions.ts` `startSession` |
 | Messages show as locked / can't be read | The device's keys changed (reinstall, new phone, cleared storage) | `chat_app/src/lib/e2e.ts`; the server can't help: content is end-to-end encrypted |
 | Messages don't arrive live (only after reload) | Socket.IO connection failing | browser devtools → Network → `socket.io`; `src/realtime/index.ts`; nginx `/socket.io/` block (Upgrade headers) |
-| Calls ring but no audio/video | TURN relay unreachable or out of ports (41 ports ≈ 20–40 relayed calls) | `systemctl status coturn`, `/etc/turnserver.conf`, `TURN_SECRET`; `chat_app/src/lib/calls.ts` |
+| Calls ring but no audio/video | TURN relay unreachable or out of relay capacity (1,000 ports / 500 allocations; bandwidth ≈ 30 relayed video calls) | `systemctl status coturn`, `/etc/turnserver.conf`, `TURN_SECRET`; `chat_app/src/lib/calls.ts` |
 | No notifications on Android | Firebase key or token issue | `/root/.hchat/firebase-service-account.json`, `FIREBASE_SERVICE_ACCOUNT`; `src/modules/notify/` |
 | File upload refused | Per-file 100 MB / per-user 2 GB / disk over 80 % | `src/modules/files/service.ts` (`QUOTA_BYTES`, `DISK_LIMIT`); `df -h /var/lib/h-chat` |
 | Phones stuck on "Update required" | Minimum app version set higher than the published APK | Backoffice → Settings → minimum app version; `/projects/mobile_builds/h_chat/latest.json` |

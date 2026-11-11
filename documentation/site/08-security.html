@@ -217,10 +217,10 @@ review is in <code>chat_backend/docs/SECURITY_REVIEW.md</code>.</p>
 <td>Keep <code>chmod 600</code>; move to a secrets manager; rotate after any incident</td>
 </tr>
 <tr>
-<td><strong>R9</strong></td>
-<td>TURN relay port range small (41 ports)</td>
-<td>Calls fail to connect at peak (availability, not confidentiality)</td>
-<td>Widen the range (Limits §7.4)</td>
+<td><del>R9</del></td>
+<td><del>TURN relay port range small (41 ports)</del> — <strong>fixed 2026-11-11 (M14):</strong> 1,000 ports, 500 allocations</td>
+<td>—</td>
+<td>Watch bandwidth instead (Limits §7.3)</td>
 </tr>
 <tr>
 <td><strong>R10</strong></td>

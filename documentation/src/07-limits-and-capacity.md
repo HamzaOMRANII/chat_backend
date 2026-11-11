@@ -46,20 +46,21 @@ connected users and hundreds of simultaneous call set-ups.
 When the two devices connect directly, audio/video **never touches the server**. Their number isn't limited by
 the server at all; only by the users' own connections.
 
-### C. Relayed calls (through coturn) — **the real limit today**
+### C. Relayed calls (through coturn)
 
 Each device that can't connect directly uses one **TURN allocation**, and each allocation needs **one relay port**.
-coturn is configured with relay ports **49160–49200 = 41 ports** (`total-quota=100`, `user-quota=12`).
+Since 2026-11-11 (M14) coturn has relay ports **49160–50159 = 1,000 ports**, `total-quota=500` allocations for the
+whole server and `user-quota=12` per user (before: 41 ports, 100 allocations).
 
-| Call type | Relay ports used | Maximum at the same time (41 ports) |
+| Call type | Allocations used | Maximum at the same time (500 allocations) |
 |---|---|---|
-| 1:1, only one side behind a strict network | 1 | ~**40** |
-| 1:1, both sides relayed | 2 | ~**20** |
-| Group call of 6, all relayed (mesh: 5 links each) | up to 30 | **1** |
-| Group call of 4, all relayed | up to 12 | ~3 |
+| 1:1, only one side behind a strict network | 1 | ~**500** |
+| 1:1, both sides relayed | 2 | ~**250** |
+| Group call of 6, all relayed (mesh: 5 links each) | up to 30 | ~**16** |
+| Group call of 4, all relayed | up to 12 | ~40 |
 
 While connecting, a device may briefly open extra allocations (UDP, TCP and TLS are all tried), so the practical
-numbers can be lower at peak moments.
+numbers can be lower at peak moments. With these numbers the **bandwidth below is the real limit**, not the ports.
 
 **Bandwidth through the relay** (each relayed stream enters and leaves the server):
 
@@ -69,19 +70,20 @@ numbers can be lower at peak moments.
 | Relayed video call (~1.5 Mbit/s each way) | ~6 Mbit/s |
 
 With a 200 Mbit/s server link (check the actual Contabo plan), that's roughly **1,000 relayed voice calls** or
-**~30 relayed video calls**, far beyond the 41-port limit. So **ports are the bottleneck, not bandwidth**.
+**~30 relayed video calls**: since M14 **bandwidth is the bottleneck, not ports**.
 
-### Realistic summary for H_CHAT 1.0
+### Realistic summary (since 1.1.2 / M14)
 
-- **Voice/video 1:1 calls:** dozens at the same time comfortably (many go direct; ~20 fully relayed at worst).
-- **Group calls:** a few at the same time; one 6-person relayed video call uses most of the relay.
+- **Voice calls:** hundreds at the same time (relayed or not).
+- **Video calls:** many go direct (no limit); about **30 fully relayed video calls** at once, set by bandwidth.
+- **Group calls:** several 6-person relayed video calls fit in the relay; bandwidth again decides.
 - **Each phone in a 6-person video call** uploads 5 video streams (~5 Mbit/s): fine on Wi-Fi, heavy on mobile data.
 
 ## 7.4 Scaling plan
 
 | Step | Change | Effect |
 |---|---|---|
-| 1 (minutes) | Widen coturn relay range, e.g. `min-port=49152`, `max-port=65535`, raise `total-quota`, open the range in the firewall | Relayed calls limited by bandwidth instead of ports: hundreds of calls |
+| ~~1~~ **done 2026-11-11 (M14)** | Widen coturn relay range, e.g. `min-port=49152`, `max-port=65535`, raise `total-quota`, open the range in the firewall | Relayed calls limited by bandwidth instead of ports: hundreds of calls |
 | 2 | Move coturn to its own small server (or add a second one in another region) | Calls don't compete with the web apps for CPU/bandwidth |
 | 3 | Group calls with an SFU (LiveKit, mediasoup, Janus) instead of mesh | Groups of 10+, each phone uploads one stream (E2E via insertable streams) |
 | 4 | Socket.IO Redis adapter + several backend processes; MongoDB replica set | More users, no single point of failure for the database |

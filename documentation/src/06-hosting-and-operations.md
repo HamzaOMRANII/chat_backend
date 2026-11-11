@@ -24,14 +24,14 @@ flowchart LR
   NG -->|"gate check<br/>(access code)"| GATE["omranisystems gate service"]
   NG -->|"127.0.0.1:12000"| APP["h-chat (Node)"]
   APP -->|"127.0.0.1:27017"| DB[("MongoDB")]
-  U -->|"UDP/TCP 3478 · TLS 5349<br/>UDP 49160–49200"| TURN["coturn"]
+  U -->|"UDP/TCP 3478 · TLS 5349<br/>UDP 49160–50159"| TURN["coturn"]
 ```
 
 | Port | Service | Exposed to |
 |---|---|---|
 | 443 / 80 | nginx (websites, API, Socket.IO, APK downloads) | Cloudflare only (iptables `CF_WEB` chain) |
 | 3478 UDP/TCP, 5349 TLS | coturn STUN/TURN | Internet |
-| 49160–49200 UDP | coturn relay ports | Internet |
+| 49160–50159 UDP | coturn relay ports | Internet |
 | 12000 | h-chat backend | 127.0.0.1 only |
 | 27017 | MongoDB (authentication enabled) | 127.0.0.1 only |
 | 22 | SSH | Internet (shared server) |

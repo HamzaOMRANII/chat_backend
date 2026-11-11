@@ -66,7 +66,7 @@ Ranked by importance (likelihood × impact).
 | **R6** | Metadata visible to the server (who/when/sizes/IPs) | Social graph exposure if the DB leaks | Minimise retention of logs; consider sealed-sender-style designs later |
 | **R7** | No forward secrecy per message (no Double Ratchet) | A stolen device key reveals that chat's still-stored messages | Short retention already limits it; a ratchet (e.g. Signal protocol / MLS for groups) for v2 |
 | **R8** | Secrets in plain files (`.env`, `/root/ACCESS.txt`, Firebase key) | Server compromise exposes them | Keep `chmod 600`; move to a secrets manager; rotate after any incident |
-| **R9** | TURN relay port range small (41 ports) | Calls fail to connect at peak (availability, not confidentiality) | Widen the range (Limits §7.4) |
+| ~~R9~~ | ~~TURN relay port range small (41 ports)~~ — **fixed 2026-11-11 (M14):** 1,000 ports, 500 allocations | — | Watch bandwidth instead (Limits §7.3) |
 | **R10** | Firebase metadata | Google learns that (and when) a phone got a notification | Generic texts already; a self-hosted push alternative (UnifiedPush) if needed |
 | **R11** | Gate codes are shared access codes | Leaked code removes one layer (accounts and E2E remain) | Rotate gate codes periodically |
 | **R12** | One-time database password exposure in a session log (18 Oct) | Low (stayed on the server) | Rotate the H_CHAT MongoDB password |

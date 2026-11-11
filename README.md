@@ -100,6 +100,6 @@ Server only: `npm run build && pm2 restart h-chat`. Logs: `pm2 logs h-chat`.
 ## Call relay (coturn)
 
 `turn.omranisystems.com` (DNS only) runs coturn with `use-auth-secret`; `TURN_SECRET` here must equal
-`static-auth-secret` in `/etc/turnserver.conf`. Ports: 3478 UDP/TCP, 5349 TLS, relay range 49160–49200 UDP.
+`static-auth-secret` in `/etc/turnserver.conf`. Ports: 3478 UDP/TCP, 5349 TLS, relay range 49160–50159 UDP (`total-quota=500`).
 Its Let's Encrypt certificate renews automatically (`/etc/letsencrypt/renewal-hooks/deploy/coturn.sh`).
 `/usr/local/sbin/turn-egress.sh` stops the relay from opening new connections to this server's own services.

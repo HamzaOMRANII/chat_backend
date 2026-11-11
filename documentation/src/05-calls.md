@@ -49,7 +49,7 @@ the call ends on both sides; if a device loses its socket for **30 seconds** the
 flowchart TB
   A["Device A"] -- "1. host candidates<br/>(same Wi-Fi)" --> B["Device B"]
   A -- "2. STUN: public address<br/>stun:turn.omranisystems.com:3478" --> STUN["coturn (STUN)"]
-  A -- "3. TURN relay (UDP 3478 · TCP 3478 · TLS 5349)<br/>when NAT/firewall block 1 and 2" --> TURN["coturn (TURN)<br/>relay ports UDP 49160–49200"]
+  A -- "3. TURN relay (UDP 3478 · TCP 3478 · TLS 5349)<br/>when NAT/firewall block 1 and 2" --> TURN["coturn (TURN)<br/>relay ports UDP 49160–50159"]
   TURN --> B
 ```
 
